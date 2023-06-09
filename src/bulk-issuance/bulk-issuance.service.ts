@@ -21,8 +21,8 @@ export class BulkIssuanceService {
         type: string,
         response: Response,
     ) {
-        // console.log('credentialPlayload: ', credentialPlayload);
-        // console.log('schemaId: ', schemaId);
+        console.log('credentialPlayload: ', credentialPlayload);
+        console.log('schemaId: ', schemaId);
 
         var issuerId = '';
 
