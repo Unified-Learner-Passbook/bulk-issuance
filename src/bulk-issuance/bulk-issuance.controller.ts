@@ -7,7 +7,10 @@ import {
   Res,
   Get,
   Headers,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { BulkIssuanceService } from './bulk-issuance.service';
 import { Response } from 'express';
 @Controller('/bulk/v1/')
@@ -29,11 +32,15 @@ export class BulkIssuanceController {
     @Body('password') password: string,
     @Res() response: Response,
   ) {
-    return this.bulkIssuanceService.getToken(
-      username,
-      password,
-      response,
-    );
+    return this.bulkIssuanceService.getToken(username, password, response);
+  }
+
+  @Post('/getdid')
+  async getDID(
+    @Body('uniquetext') uniquetext: string,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getDID(uniquetext, response);
   }
 
   @Post('/issuerregister')
@@ -62,11 +69,13 @@ export class BulkIssuanceController {
     @Body('password') password: string,
     @Res() response: Response,
   ) {
-    return this.bulkIssuanceService.getToken(
-      username,
-      password,
-      response,
-    );
+    return this.bulkIssuanceService.getToken(username, password, response);
+  }
+
+  @Post('/uploadFiles')
+  @UseInterceptors(FileInterceptor('csvfile'))
+  async getUploadFiles(@UploadedFile() csvfile, @Res() response: Response) {
+    return this.bulkIssuanceService.getUploadFiles(csvfile, response);
   }
 
   @Post('/upload/:type')

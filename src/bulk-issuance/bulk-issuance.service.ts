@@ -18,6 +18,9 @@ export class BulkIssuanceService {
     private readonly httpService: HttpService,
   ) {}
 
+  fs = require('fs');
+  parse = require('csv-parse');
+  async = require('async');
   //getToken
   async getToken(username: string, password: string, response: Response) {
     let qs = require('qs');
@@ -62,6 +65,36 @@ export class BulkIssuanceService {
           result: keycloak_response?.access_token
             ? keycloak_response.access_token
             : '',
+        });
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getDID
+  async getDID(uniquetext: string, response: Response) {
+    if (uniquetext) {
+      const generateddid = await this.credService.generateDid(uniquetext);
+      if (generateddid?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'did_generate_error',
+          message: 'Identity Generation Failed ! Please Try Again.',
+          result: generateddid?.error,
+        });
+      } else {
+        var did = generateddid[0].verificationMethod[0].controller;
+        return response.status(200).send({
+          success: true,
+          status: 'did_success',
+          message: 'DID Success',
+          result: did,
         });
       }
     } else {
@@ -162,6 +195,53 @@ export class BulkIssuanceService {
           result: null,
         });
       }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getUploadFiles
+  async getUploadFiles(csvfile, response: Response) {
+    if (csvfile) {
+      var inputFile = csvfile.originalname;
+
+      var csvData = [];
+      this.fs
+        .createReadStream(inputFile)
+        .pipe(this.parse())
+        .on('data', function (data) {
+          try {
+            console.log('username ' + data.username);
+            //perform the operation
+          } catch (err) {
+            //error handler
+          }
+        })
+        .on('end', function () {
+          //some final operation
+        });
+      /*fs.createReadStream(csvfile.path)
+        .pipe(parse({ delimiter: ':' }))
+        .on('data', function (csvrow) {
+          console.log(csvrow);
+          //do something with csvrow
+          csvData.push(csvrow);
+        })
+        .on('end', function () {
+          //do something with csvData
+          console.log(csvData);
+        });*/
+      return response.status(200).send({
+        success: true,
+        status: 'file_receive',
+        message: 'File Received',
+        result: csvfile,
+      });
     } else {
       return response.status(400).send({
         success: false,

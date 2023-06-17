@@ -57,7 +57,7 @@ export class CredentialsService {
       const promise = observable.toPromise();
 
       const response = await promise;
-      console.log('generateDid 67', response.data);
+      //console.log('generateDid 67', response.data);
       return response.data;
     } catch (e) {
       console.log('did error', e.message);
