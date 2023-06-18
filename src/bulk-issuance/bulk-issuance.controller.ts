@@ -72,34 +72,25 @@ export class BulkIssuanceController {
     return this.bulkIssuanceService.getToken(username, password, response);
   }
 
-  @Post('/uploadFiles')
+  @Post('/uploadFiles/:type')
   @UseInterceptors(FileInterceptor('csvfile'))
-  async getUploadFiles(@UploadedFile() csvfile, @Res() response: Response) {
-    return this.bulkIssuanceService.getUploadFiles(csvfile, response);
-  }
-
-  @Post('/upload/:type')
-  bulkUpload(
+  async getUploadFiles(
+    @Headers('Authorization') auth: string,
     @Param('type') type: string,
-    @Body() payload: any,
+    @Body('issuerDetail') issuerDetail: any,
+    @Body('vcData') vcData: any,
+    @Body('credentialSubjectCommon') credentialSubjectCommon: any,
+    @UploadedFile() csvfile: Express.Multer.File,
     @Res() response: Response,
   ) {
-    console.log('body', payload);
-    console.log('params', type);
-
-    if (type === 'proofOfAssessment') {
-      var schemaId = process.env.PROOF_OF_ASSESSMENT;
-    }
-    if (type === 'proofOfEnrollment') {
-      var schemaId = process.env.PROOF_OF_ENROLLMENT;
-    }
-    if (type === 'proofOfBenifits') {
-      var schemaId = process.env.PROOF_OF_BENIFIT;
-    }
-    return this.bulkIssuanceService.issueBulkCredential(
-      payload,
-      schemaId,
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getUploadFiles(
+      jwt,
       type,
+      issuerDetail,
+      vcData,
+      credentialSubjectCommon,
+      csvfile,
       response,
     );
   }
