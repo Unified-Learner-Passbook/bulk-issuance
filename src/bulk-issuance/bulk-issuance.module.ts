@@ -4,12 +4,11 @@ import { BulkIssuanceController } from './bulk-issuance.controller';
 import { CredentialsModule } from 'src/services/credentials/credentials.module';
 import { SbrcModule } from 'src/services/sbrc/sbrc.module';
 import { TelemetryModule } from 'src/services/telemetry/telemetry.module';
-
+import { KeycloakModule } from 'src/services/keycloak/keycloak.module';
 
 @Module({
-  imports: [CredentialsModule, SbrcModule, TelemetryModule],
+  imports: [CredentialsModule, SbrcModule, TelemetryModule, KeycloakModule],
   controllers: [BulkIssuanceController],
   providers: [BulkIssuanceService],
-  
 })
 export class BulkIssuanceModule {}
