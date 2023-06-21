@@ -6,6 +6,8 @@ import { CredentialsModule } from './services/credentials/credentials.module';
 import { SbrcModule } from './services/sbrc/sbrc.module';
 import { TelemetryModule } from './services/telemetry/telemetry.module';
 import { KeycloakModule } from './services/keycloak/keycloak.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersModule } from './services/users/users.module';
 
 @Module({
   imports: [
@@ -19,6 +21,18 @@ import { KeycloakModule } from './services/keycloak/keycloak.module';
     SbrcModule,
     TelemetryModule,
     KeycloakModule,
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: '64.227.185.154',
+      port: 5432,
+      username: 'postgres',
+      password: '4E3k%nC*AG',
+      database: 'middleware_db',
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      synchronize: true,
+      logging: true
+    }),
+    UsersModule,
   ],
   providers: [],
 })
