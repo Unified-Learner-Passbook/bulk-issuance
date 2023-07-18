@@ -161,8 +161,55 @@ export class BulkIssuanceService {
     }
   }
 
-  //getSchemaRequired
-  async getSchemaRequired(schema_id: string, response: Response) {
+  //getCredentialSchemaList
+  async getCredentialSchemaList(postrequest: any, response: Response) {
+    if (postrequest?.taglist && postrequest?.taglist.length > 0) {
+      const getschemalist = await this.credService.schemaList(
+        postrequest?.taglist,
+      );
+      if (getschemalist?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'get_schema_error',
+          message: 'Get Schema List Failed ! Please Try Again.',
+          result: null,
+        });
+      } else {
+        if (getschemalist.length > 0) {
+          let schemalist = [];
+          for (let i = 0; i < getschemalist.length; i++) {
+            schemalist.push({
+              schema_name: getschemalist[i]?.name,
+              schema_id: getschemalist[i]?.id,
+            });
+          }
+          return response.status(200).send({
+            success: true,
+            status: 'schema_list_success',
+            message: 'Schema List Success',
+            result: schemalist,
+          });
+        } else {
+          return response.status(400).send({
+            success: false,
+            status: 'get_schema_list_no_found',
+            message: 'Get Schema List Not Found ! Please Change Tags.',
+            result: null,
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getSchemaFields
+  async getSchemaFields(schema_id: string, response: Response) {
     if (schema_id) {
       const getschema = await this.credService.generateSchema(schema_id);
       if (!getschema) {
@@ -174,13 +221,31 @@ export class BulkIssuanceService {
         });
       } else {
         if (getschema?.schema?.required) {
+          let schema_fields = getschema?.schema?.properties;
+          let required_fileds = getschema?.schema?.required;
+          let allfields = Object.keys(schema_fields);
+          let optional_fileds = [];
+          for (let i = 0; i < allfields.length; i++) {
+            let found = false;
+            for (let j = 0; j < required_fileds.length; j++) {
+              if (allfields[i] === required_fileds[j]) {
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              optional_fileds.push(allfields[i]);
+            }
+          }
+
           let schema_result = {
             id: getschema?.id,
             name: getschema?.name,
             version: getschema?.version,
             author: getschema?.author,
-            schemaid: getschema?.schema?.id,
-            required: getschema?.schema?.required,
+            schemaid: getschema?.schema?.$id,
+            required: required_fileds,
+            optional: optional_fileds,
           };
 
           return response.status(200).send({
@@ -210,7 +275,12 @@ export class BulkIssuanceService {
 
   //getCredentialIssue
   async getCredentialIssue(postrequest: any, response: Response) {
-    if (postrequest?.schema_id) {
+    if (
+      postrequest?.schema_id &&
+      postrequest?.issuerDetail?.did &&
+      postrequest?.vcData &&
+      postrequest?.credentialSubject
+    ) {
       const getschema = await this.credService.generateSchema(
         postrequest?.schema_id,
       );
@@ -223,20 +293,14 @@ export class BulkIssuanceService {
         });
       } else {
         if (getschema?.schema?.required) {
-          let schema_result = {
-            id: getschema?.id,
-            name: getschema?.name,
-            version: getschema?.version,
-            author: getschema?.author,
-            schemaid: getschema?.schema?.id,
-            required: getschema?.schema?.required,
-          };
+          //required_fileds
+          let required_fileds = getschema?.schema?.required;
 
           return response.status(200).send({
             success: true,
             status: 'issue_success',
             message: 'Issue Success',
-            result: schema_result,
+            //result: schema_result,
           });
         } else {
           return response.status(400).send({

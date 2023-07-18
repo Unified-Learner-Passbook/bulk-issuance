@@ -69,12 +69,21 @@ export class BulkIssuanceController {
   }
 
   //get credentials/schema/required
-  @Post('/credential/schema/required')
-  async getSchemaRequired(
+
+  @Post('/credential/schema/list')
+  async getCredentialSchemaList(
+    @Body() postrequest: any,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getCredentialSchemaList(postrequest, response);
+  }
+
+  @Post('/credential/schema/fields')
+  async getSchemaFields(
     @Body('schema_id') schema_id: string,
     @Res() response: Response,
   ) {
-    return this.bulkIssuanceService.getSchemaRequired(schema_id, response);
+    return this.bulkIssuanceService.getSchemaFields(schema_id, response);
   }
 
   @Post('/credential/issue')
