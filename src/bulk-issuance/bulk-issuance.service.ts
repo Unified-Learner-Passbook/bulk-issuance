@@ -223,6 +223,15 @@ export class BulkIssuanceService {
         if (getschema?.schema?.required) {
           let schema_fields = getschema?.schema?.properties;
           let required_fileds = getschema?.schema?.required;
+          if (!required_fileds.includes('student_name')) {
+            required_fileds.push('student_name');
+          }
+          if (!required_fileds.includes('dob')) {
+            required_fileds.push('dob');
+          }
+          if (!required_fileds.includes('aadhar_token')) {
+            required_fileds.push('aadhar_token');
+          }
           let allfields = Object.keys(schema_fields);
           let optional_fileds = [];
           for (let i = 0; i < allfields.length; i++) {
@@ -293,15 +302,315 @@ export class BulkIssuanceService {
         });
       } else {
         if (getschema?.schema?.required) {
+          //all fields
+          let schema_fields = getschema?.schema?.properties;
+          let all_schema_properties_fields = Object.keys(schema_fields);
           //required_fileds
           let required_fileds = getschema?.schema?.required;
+          let invite_fileds = [];
+          invite_fileds.push('student_name');
+          invite_fileds.push('dob');
+          invite_fileds.push('aadhar_token');
+          let all_imp_fields = required_fileds;
+          if (!all_imp_fields.includes('student_name')) {
+            all_imp_fields.push('student_name');
+          }
+          if (!all_imp_fields.includes('dob')) {
+            all_imp_fields.push('dob');
+          }
+          if (!all_imp_fields.includes('aadhar_token')) {
+            all_imp_fields.push('aadhar_token');
+          }
+          //register bulk student
+          let credentialPlayload = postrequest;
+          let schemaId = postrequest?.schema_id;
+          console.log('credentialPlayload: ', credentialPlayload);
+          console.log('schemaId: ', schemaId);
 
-          return response.status(200).send({
-            success: true,
-            status: 'issue_success',
-            message: 'Issue Success',
-            //result: schema_result,
-          });
+          var issuerId = credentialPlayload.issuerDetail.did;
+
+          //generate schema
+          var schemaRes = getschema;
+          console.log('schemaRes', schemaRes);
+
+          if (schemaRes) {
+            //error log report
+            let iserror = false;
+            let loglist = [];
+            let error_count = 0;
+            let success_count = 0;
+            let i_count = 0;
+
+            var responseArray = [];
+
+            // bulk import
+            for (const iterator of credentialPlayload.credentialSubject) {
+              loglist[i_count] = {};
+              loglist[i_count].studentDetails = iterator;
+
+              try {
+                //check iterator present all required field or not
+                let valid_data = true;
+                let not_found = '';
+                //check validation
+                let allfields = Object.keys(iterator);
+                for (let i = 0; i < all_imp_fields.length; i++) {
+                  let found = false;
+                  for (let j = 0; j < allfields.length; j++) {
+                    if (all_imp_fields[i] === allfields[j]) {
+                      found = true;
+                      break;
+                    }
+                  }
+                  if (!found) {
+                    not_found = all_imp_fields[i];
+                    valid_data = false;
+                  }
+                }
+                //check validation
+                if (valid_data) {
+                  let new_iterator = {};
+                  for (
+                    let i = 0;
+                    i < all_schema_properties_fields.length;
+                    i++
+                  ) {
+                    new_iterator[all_schema_properties_fields[i]] =
+                      iterator[all_schema_properties_fields[i]];
+                  }
+                  console.log('new_iterator', new_iterator);
+                  //generate did or find did
+                  var aadhar_token = iterator.aadhar_token;
+
+                  // find student
+                  let searchSchema = {
+                    filters: {
+                      aadhar_token: {
+                        eq: aadhar_token,
+                      },
+                    },
+                  };
+                  const studentDetails = await this.sbrcService.sbrcSearch(
+                    searchSchema,
+                    'Learner',
+                  );
+                  console.log('Learner Details', studentDetails);
+                  if (studentDetails.length > 0) {
+                    if (studentDetails[0]?.did) {
+                      new_iterator['id'] = studentDetails[0].did;
+                      let obj = {
+                        issuerId: issuerId,
+                        credSchema: schemaRes,
+                        credentialSubject: new_iterator,
+                        issuanceDate: credentialPlayload.vcData.issuanceDate,
+                        expirationDate:
+                          credentialPlayload.vcData.expirationDate,
+                      };
+                      console.log('obj', obj);
+
+                      const cred = await this.credService.issueCredentials(obj);
+                      //console.log("cred 34", cred)
+                      if (cred) {
+                        responseArray.push(cred);
+                        loglist[i_count].status = true;
+                        loglist[i_count].error = {};
+                        success_count++;
+                      } else {
+                        responseArray.push({
+                          error: 'unable to issue credentials!',
+                        });
+                        iserror = true;
+                        loglist[i_count].status = false;
+                        loglist[i_count].error =
+                          'Unable to Issue Credentials ! Please Try Again.';
+                        //loglist[i_count].errorlog = {};
+                        error_count++;
+                      }
+                    } else {
+                      let didRes = await this.credService.generateDid(
+                        aadhar_token,
+                      );
+
+                      if (didRes) {
+                        new_iterator['id'] =
+                          didRes[0].verificationMethod[0].controller;
+                        let updateRes = await this.sbrcService.sbrcUpdate(
+                          { did: iterator.id },
+                          'Learner',
+                          studentDetails[0].osid,
+                        );
+                        if (updateRes) {
+                          let obj = {
+                            issuerId: issuerId,
+                            credSchema: schemaRes,
+                            credentialSubject: new_iterator,
+                            issuanceDate:
+                              credentialPlayload.vcData.issuanceDate,
+                            expirationDate:
+                              credentialPlayload.vcData.expirationDate,
+                          };
+                          console.log('obj', obj);
+
+                          if (new_iterator['id']) {
+                            const cred =
+                              await this.credService.issueCredentials(obj);
+                            //console.log("cred 34", cred)
+                            if (cred) {
+                              responseArray.push(cred);
+                              loglist[i_count].status = true;
+                              loglist[i_count].error = {};
+                              success_count++;
+                            } else {
+                              responseArray.push({
+                                error: 'unable to issue credentials!',
+                              });
+                              iserror = true;
+                              loglist[i_count].status = false;
+                              loglist[i_count].error =
+                                'Unable to Issue Credentials ! Please Try Again.';
+                              //loglist[i_count].errorlog = {};
+                              error_count++;
+                            }
+                          }
+                        } else {
+                          responseArray.push({
+                            error: 'unable to update did inside RC!',
+                          });
+                          iserror = true;
+                          loglist[i_count].status = false;
+                          loglist[i_count].error =
+                            'Unable to Update Student Identity ! Please Try Again.';
+                          //loglist[i_count].errorlog = {};
+                          error_count++;
+                        }
+                      } else {
+                        responseArray.push({
+                          error: 'unable to generate student did!',
+                        });
+                        iserror = true;
+                        loglist[i_count].status = false;
+                        loglist[i_count].error =
+                          'Unable to Generate Student DID ! Please Try Again.';
+                        //loglist[i_count].errorlog = {};
+                        error_count++;
+                      }
+                    }
+                  } else {
+                    let didRes = await this.credService.generateDid(
+                      aadhar_token,
+                    );
+
+                    if (didRes) {
+                      new_iterator['id'] =
+                        didRes[0].verificationMethod[0].controller;
+                      let inviteSchema = {
+                        name: new_iterator['student_name'],
+                        dob: new_iterator['dob'],
+                        did: new_iterator['id'],
+                        username: '',
+                        aadhar_token: new_iterator['aadhar_token'],
+                      };
+                      console.log('inviteSchema', inviteSchema);
+                      let createStudent = await this.sbrcService.sbrcInvite(
+                        inviteSchema,
+                        'Learner',
+                      );
+                      console.log('createStudent', createStudent);
+
+                      if (createStudent) {
+                        let obj = {
+                          issuerId: issuerId,
+                          credSchema: schemaRes,
+                          credentialSubject: new_iterator,
+                          issuanceDate: credentialPlayload.vcData.issuanceDate,
+                          expirationDate:
+                            credentialPlayload.vcData.expirationDate,
+                        };
+                        console.log('obj', obj);
+
+                        const cred = await this.credService.issueCredentials(
+                          obj,
+                        );
+                        //console.log("cred 34", cred)
+                        if (cred) {
+                          responseArray.push(cred);
+                          loglist[i_count].status = true;
+                          loglist[i_count].error = {};
+                          success_count++;
+                        } else {
+                          responseArray.push({
+                            error: 'unable to issue credentials!',
+                          });
+                          iserror = true;
+                          loglist[i_count].status = false;
+                          loglist[i_count].error =
+                            'Unable to Issue Credentials ! Please Try Again.';
+                          //loglist[i_count].errorlog = {};
+                          error_count++;
+                        }
+                      } else {
+                        responseArray.push({
+                          error: 'unable to create student in RC!',
+                        });
+                        iserror = true;
+                        loglist[i_count].status = false;
+                        loglist[i_count].error =
+                          'Unable to Create Student Account ! Please Try Again.';
+                        //loglist[i_count].errorlog = {};
+                        error_count++;
+                      }
+                    } else {
+                      responseArray.push({
+                        error: 'unable to generate student did!',
+                      });
+                      iserror = true;
+                      loglist[i_count].status = false;
+                      loglist[i_count].error =
+                        'Unable to Generate Student DID ! Please Try Again.';
+                      //loglist[i_count].errorlog = {};
+                      error_count++;
+                    }
+                  }
+                } else {
+                  responseArray.push({
+                    error: 'not received schema required fields: ' + not_found,
+                  });
+                  iserror = true;
+                  loglist[i_count].status = false;
+                  loglist[i_count].error =
+                    'not received schema required fields: ' + not_found;
+                  //loglist[i_count].errorlog = {};
+                  error_count++;
+                }
+              } catch (e) {
+                console.log(e);
+                iserror = true;
+                loglist[i_count].status = false;
+                loglist[i_count].error = 'System Exception ! Please Try Again.';
+                loglist[i_count].errorlog = JSON.stringify(e);
+                error_count++;
+              }
+              i_count++;
+            }
+
+            return response.status(200).send({
+              success: true,
+              status: 'student_bulk_upload_api_success',
+              iserror: iserror,
+              message: 'Student Bulk Upload API Success.',
+              error_count: error_count,
+              success_count: success_count,
+              result: loglist,
+            });
+          } else {
+            return response.status(200).send({
+              success: false,
+              status: 'did_cred_generate_error',
+              message:
+                'User Identity and Credentials Generation Failed. Schema Not Found. Try Again.',
+              result: null,
+            });
+          }
         } else {
           return response.status(400).send({
             success: false,
