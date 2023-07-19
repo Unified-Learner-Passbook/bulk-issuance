@@ -41,5 +41,4 @@ node() {
                 build job: 'ULP/deploy-staging/bulk-issurance', parameters: [string(name: 'tag', value: 'main')]
          }
     }
-    
 }
