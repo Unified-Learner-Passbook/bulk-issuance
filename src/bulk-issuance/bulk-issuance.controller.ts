@@ -24,6 +24,7 @@ export class BulkIssuanceController {
 
   @Get('/test')
   getUser(@Res() response: Response) {
+    const TESTVAR = process.env.TESTVAR;
     const CRED_URL = process.env.CRED_URL;
     const DID_URL = process.env.DID_URL;
     const SCHEMA_URL = process.env.SCHEMA_URL;
@@ -32,6 +33,7 @@ export class BulkIssuanceController {
     const result = {
       success: true,
       message: 'Bulk Issuance API Working 14 July 23',
+      TESTVAR: TESTVAR,
       CRED_URL: CRED_URL,
       DID_URL: DID_URL,
       SCHEMA_URL: SCHEMA_URL,
@@ -75,7 +77,10 @@ export class BulkIssuanceController {
     @Body() postrequest: any,
     @Res() response: Response,
   ) {
-    return this.bulkIssuanceService.getCredentialSchemaList(postrequest, response);
+    return this.bulkIssuanceService.getCredentialSchemaList(
+      postrequest,
+      response,
+    );
   }
 
   @Post('/credential/schema/fields')
