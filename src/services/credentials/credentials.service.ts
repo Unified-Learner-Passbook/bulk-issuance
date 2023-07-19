@@ -6,6 +6,25 @@ import { AxiosRequestConfig } from 'axios';
 export class CredentialsService {
   constructor(private readonly httpService: HttpService) {}
 
+  //schema list
+  async schemaList(taglist) {
+    const url = `${process.env.SCHEMA_URL}/schema/tags?tags=${taglist}`;
+    let response_list = null;
+    try {
+      const observable = this.httpService.get(url);
+
+      const promise = observable.toPromise();
+
+      const response = await promise;
+      response_list = response.data;
+      //console.log(response.data);
+    } catch (e) {
+      console.log('schema error', e.message);
+      response_list = { error: e };
+    }
+    return response_list;
+  }
+
   //generate schema
   async generateSchema(schemaId) {
     const url = `${process.env.SCHEMA_URL}/schema/jsonld?id=${schemaId}`;
