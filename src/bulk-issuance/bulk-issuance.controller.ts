@@ -112,6 +112,14 @@ export class BulkIssuanceController {
     return this.bulkIssuanceService.getCredentialIssue(postrequest, response);
   }
 
+  @Post('/user/create')
+  async getUserCreate(
+    @Body() postrequest: any,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getUserCreate(postrequest, response);
+  }
+
   //deprecated
   @Post('/issuertoken')
   async getIssuerToken(
