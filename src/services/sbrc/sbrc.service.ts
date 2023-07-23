@@ -83,6 +83,7 @@ export class SbrcService {
 
       return response.data;
     } catch (e) {
+      console.log(JSON.stringify(e))
       console.log('sbrcUpdate error', e.message);
     }
   }
