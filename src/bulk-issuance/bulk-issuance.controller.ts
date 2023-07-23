@@ -33,7 +33,7 @@ export class BulkIssuanceController {
     const LEARNER_SCHEMA_FIELD = process.env.LEARNER_SCHEMA_FIELD;
     const result = {
       success: true,
-      message: 'Bulk Issuance API Working 20 July 23',
+      message: 'Bulk Issuance API Working 23 July 23',
       TESTVAR: TESTVAR,
       CRED_URL: CRED_URL,
       DID_URL: DID_URL,
