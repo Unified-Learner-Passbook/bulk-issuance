@@ -160,12 +160,40 @@ export class BulkIssuanceService {
       });
     }
   }
-
+  //getCredentialSchemaCreate
+  async getCredentialSchemaCreate(postrequest: any, response: Response) {
+    if (postrequest) {
+      const getschemacreate = await this.credService.schemaCreate(postrequest);
+      if (getschemacreate?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'get_schema_error',
+          message: 'Get Schema Create Failed ! Please Try Again.',
+          result: getschemacreate,
+        });
+      } else {
+        return response.status(200).send({
+          success: true,
+          status: 'schema_create_success',
+          message: 'Schema Create Success',
+          result: getschemacreate,
+        });
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
   //getCredentialSchemaList
   async getCredentialSchemaList(postrequest: any, response: Response) {
-    if (postrequest?.taglist && postrequest?.taglist.length > 0) {
+    if (postrequest?.taglist) {
+      console.log(postrequest.taglist);
       const getschemalist = await this.credService.schemaList(
-        postrequest?.taglist,
+        '[' + postrequest?.taglist + ']',
       );
       if (getschemalist?.error) {
         return response.status(400).send({
@@ -190,7 +218,7 @@ export class BulkIssuanceService {
             result: schemalist,
           });
         } else {
-          return response.status(400).send({
+          return response.status(200).send({
             success: false,
             status: 'get_schema_list_no_found',
             message: 'Get Schema List Not Found ! Please Change Tags.',
@@ -223,14 +251,12 @@ export class BulkIssuanceService {
         if (getschema?.schema?.required) {
           let schema_fields = getschema?.schema?.properties;
           let required_fileds = getschema?.schema?.required;
-          if (!required_fileds.includes('student_name')) {
-            required_fileds.push('student_name');
-          }
-          if (!required_fileds.includes('dob')) {
-            required_fileds.push('dob');
-          }
-          if (!required_fileds.includes('aadhar_token')) {
-            required_fileds.push('aadhar_token');
+          let learner_schema_field =
+            process.env.LEARNER_SCHEMA_FIELD.split(' ');
+          for (let i = 0; i < learner_schema_field.length; i++) {
+            if (!required_fileds.includes(learner_schema_field[i])) {
+              required_fileds.push(learner_schema_field[i]);
+            }
           }
           let allfields = Object.keys(schema_fields);
           let optional_fileds = [];
@@ -308,18 +334,16 @@ export class BulkIssuanceService {
           //required_fileds
           let required_fileds = getschema?.schema?.required;
           let invite_fileds = [];
-          invite_fileds.push('student_name');
-          invite_fileds.push('dob');
-          invite_fileds.push('aadhar_token');
+          let learner_schema_field =
+            process.env.LEARNER_SCHEMA_FIELD.split(' ');
+          for (let i = 0; i < learner_schema_field.length; i++) {
+            invite_fileds.push(learner_schema_field[i]);
+          }
           let all_imp_fields = required_fileds;
-          if (!all_imp_fields.includes('student_name')) {
-            all_imp_fields.push('student_name');
-          }
-          if (!all_imp_fields.includes('dob')) {
-            all_imp_fields.push('dob');
-          }
-          if (!all_imp_fields.includes('aadhar_token')) {
-            all_imp_fields.push('aadhar_token');
+          for (let i = 0; i < learner_schema_field.length; i++) {
+            if (!all_imp_fields.includes(learner_schema_field[i])) {
+              all_imp_fields.push(learner_schema_field[i]);
+            }
           }
           //register bulk student
           let credentialPlayload = postrequest;
@@ -369,14 +393,21 @@ export class BulkIssuanceService {
                 }
                 //check validation
                 if (valid_data) {
+                  console.log(
+                    'all_schema_properties_fields',
+                    all_schema_properties_fields,
+                  );
+                  console.log('iterator', iterator);
                   let new_iterator = {};
                   for (
                     let i = 0;
                     i < all_schema_properties_fields.length;
                     i++
                   ) {
-                    new_iterator[all_schema_properties_fields[i]] =
-                      iterator[all_schema_properties_fields[i]];
+                    if (iterator[all_schema_properties_fields[i]]) {
+                      new_iterator[all_schema_properties_fields[i]] =
+                        iterator[all_schema_properties_fields[i]];
+                    }
                   }
                   console.log('new_iterator', new_iterator);
                   //generate did or find did
@@ -395,129 +426,13 @@ export class BulkIssuanceService {
                     'Learner',
                   );
                   console.log('Learner Details', studentDetails);
-                  if (studentDetails.length > 0) {
-                    if (studentDetails[0]?.did) {
-                      new_iterator['id'] = studentDetails[0].did;
-                      let obj = {
-                        issuerId: issuerId,
-                        credSchema: schemaRes,
-                        credentialSubject: new_iterator,
-                        issuanceDate: credentialPlayload.vcData.issuanceDate,
-                        expirationDate:
-                          credentialPlayload.vcData.expirationDate,
-                      };
-                      console.log('obj', obj);
-
-                      const cred = await this.credService.issueCredentials(obj);
-                      //console.log("cred 34", cred)
-                      if (cred) {
-                        responseArray.push(cred);
-                        loglist[i_count].status = true;
-                        loglist[i_count].error = {};
-                        success_count++;
-                      } else {
-                        responseArray.push({
-                          error: 'unable to issue credentials!',
-                        });
-                        iserror = true;
-                        loglist[i_count].status = false;
-                        loglist[i_count].error =
-                          'Unable to Issue Credentials ! Please Try Again.';
-                        //loglist[i_count].errorlog = {};
-                        error_count++;
-                      }
-                    } else {
-                      let didRes = await this.credService.generateDid(
-                        aadhar_token,
-                      );
-
-                      if (didRes) {
-                        new_iterator['id'] =
-                          didRes[0].verificationMethod[0].controller;
-                        let updateRes = await this.sbrcService.sbrcUpdate(
-                          { did: iterator.id },
-                          'Learner',
-                          studentDetails[0].osid,
-                        );
-                        if (updateRes) {
-                          let obj = {
-                            issuerId: issuerId,
-                            credSchema: schemaRes,
-                            credentialSubject: new_iterator,
-                            issuanceDate:
-                              credentialPlayload.vcData.issuanceDate,
-                            expirationDate:
-                              credentialPlayload.vcData.expirationDate,
-                          };
-                          console.log('obj', obj);
-
-                          if (new_iterator['id']) {
-                            const cred =
-                              await this.credService.issueCredentials(obj);
-                            //console.log("cred 34", cred)
-                            if (cred) {
-                              responseArray.push(cred);
-                              loglist[i_count].status = true;
-                              loglist[i_count].error = {};
-                              success_count++;
-                            } else {
-                              responseArray.push({
-                                error: 'unable to issue credentials!',
-                              });
-                              iserror = true;
-                              loglist[i_count].status = false;
-                              loglist[i_count].error =
-                                'Unable to Issue Credentials ! Please Try Again.';
-                              //loglist[i_count].errorlog = {};
-                              error_count++;
-                            }
-                          }
-                        } else {
-                          responseArray.push({
-                            error: 'unable to update did inside RC!',
-                          });
-                          iserror = true;
-                          loglist[i_count].status = false;
-                          loglist[i_count].error =
-                            'Unable to Update Student Identity ! Please Try Again.';
-                          //loglist[i_count].errorlog = {};
-                          error_count++;
-                        }
-                      } else {
-                        responseArray.push({
-                          error: 'unable to generate student did!',
-                        });
-                        iserror = true;
-                        loglist[i_count].status = false;
-                        loglist[i_count].error =
-                          'Unable to Generate Student DID ! Please Try Again.';
-                        //loglist[i_count].errorlog = {};
-                        error_count++;
-                      }
-                    }
-                  } else {
-                    let didRes = await this.credService.generateDid(
-                      aadhar_token,
-                    );
-
-                    if (didRes) {
-                      new_iterator['id'] =
-                        didRes[0].verificationMethod[0].controller;
-                      let inviteSchema = {
-                        name: new_iterator['student_name'],
-                        dob: new_iterator['dob'],
-                        did: new_iterator['id'],
-                        username: '',
-                        aadhar_token: new_iterator['aadhar_token'],
-                      };
-                      console.log('inviteSchema', inviteSchema);
-                      let createStudent = await this.sbrcService.sbrcInvite(
-                        inviteSchema,
-                        'Learner',
-                      );
-                      console.log('createStudent', createStudent);
-
-                      if (createStudent) {
+                  if (
+                    typeof studentDetails !== 'undefined' &&
+                    studentDetails !== null
+                  ) {
+                    if (studentDetails.length > 0) {
+                      if (studentDetails[0]?.did) {
+                        new_iterator['id'] = studentDetails[0].did;
                         let obj = {
                           issuerId: issuerId,
                           credSchema: schemaRes,
@@ -549,27 +464,161 @@ export class BulkIssuanceService {
                           error_count++;
                         }
                       } else {
+                        let didRes = await this.credService.generateDid(
+                          aadhar_token,
+                        );
+                        console.log('did', didRes);
+                        if (didRes) {
+                          new_iterator['id'] =
+                            didRes[0].verificationMethod[0].controller;
+                          let updateRes = await this.sbrcService.sbrcUpdate(
+                            { did: new_iterator['id'] },
+                            'Learner',
+                            studentDetails[0].osid,
+                          );
+                          if (updateRes) {
+                            let obj = {
+                              issuerId: issuerId,
+                              credSchema: schemaRes,
+                              credentialSubject: new_iterator,
+                              issuanceDate:
+                                credentialPlayload.vcData.issuanceDate,
+                              expirationDate:
+                                credentialPlayload.vcData.expirationDate,
+                            };
+                            console.log('obj', obj);
+
+                            if (new_iterator['id']) {
+                              const cred =
+                                await this.credService.issueCredentials(obj);
+                              //console.log("cred 34", cred)
+                              if (cred) {
+                                responseArray.push(cred);
+                                loglist[i_count].status = true;
+                                loglist[i_count].error = {};
+                                success_count++;
+                              } else {
+                                responseArray.push({
+                                  error: 'unable to issue credentials!',
+                                });
+                                iserror = true;
+                                loglist[i_count].status = false;
+                                loglist[i_count].error =
+                                  'Unable to Issue Credentials ! Please Try Again.';
+                                //loglist[i_count].errorlog = {};
+                                error_count++;
+                              }
+                            }
+                          } else {
+                            responseArray.push({
+                              error: 'unable to update did inside RC!',
+                            });
+                            iserror = true;
+                            loglist[i_count].status = false;
+                            loglist[i_count].error =
+                              'Unable to Update Student Identity ! Please Try Again.';
+                            //loglist[i_count].errorlog = {};
+                            error_count++;
+                          }
+                        } else {
+                          responseArray.push({
+                            error: 'unable to generate student did!',
+                          });
+                          iserror = true;
+                          loglist[i_count].status = false;
+                          loglist[i_count].error =
+                            'Unable to Generate Student DID ! Please Try Again.';
+                          //loglist[i_count].errorlog = {};
+                          error_count++;
+                        }
+                      }
+                    } else {
+                      let didRes = await this.credService.generateDid(
+                        aadhar_token,
+                      );
+
+                      if (didRes) {
+                        new_iterator['id'] =
+                          didRes[0].verificationMethod[0].controller;
+                        let inviteSchema = {
+                          name: iterator['student_name'],
+                          dob: iterator['dob'],
+                          did: new_iterator['id'],
+                          username: '',
+                          aadhar_token: iterator['aadhar_token'],
+                        };
+                        console.log('inviteSchema', inviteSchema);
+                        let createStudent = await this.sbrcService.sbrcInvite(
+                          inviteSchema,
+                          'Learner',
+                        );
+                        console.log('createStudent', createStudent);
+
+                        if (createStudent) {
+                          let obj = {
+                            issuerId: issuerId,
+                            credSchema: schemaRes,
+                            credentialSubject: new_iterator,
+                            issuanceDate:
+                              credentialPlayload.vcData.issuanceDate,
+                            expirationDate:
+                              credentialPlayload.vcData.expirationDate,
+                          };
+                          console.log('obj', obj);
+
+                          const cred = await this.credService.issueCredentials(
+                            obj,
+                          );
+                          //console.log("cred 34", cred)
+                          if (cred) {
+                            responseArray.push(cred);
+                            loglist[i_count].status = true;
+                            loglist[i_count].error = {};
+                            success_count++;
+                          } else {
+                            responseArray.push({
+                              error: 'unable to issue credentials!',
+                            });
+                            iserror = true;
+                            loglist[i_count].status = false;
+                            loglist[i_count].error =
+                              'Unable to Issue Credentials ! Please Try Again.';
+                            //loglist[i_count].errorlog = {};
+                            error_count++;
+                          }
+                        } else {
+                          responseArray.push({
+                            error: 'unable to create student in RC!',
+                          });
+                          iserror = true;
+                          loglist[i_count].status = false;
+                          loglist[i_count].error =
+                            'Unable to Create Student Account ! Please Try Again.';
+                          //loglist[i_count].errorlog = {};
+                          error_count++;
+                        }
+                      } else {
                         responseArray.push({
-                          error: 'unable to create student in RC!',
+                          error: 'unable to generate student did!',
                         });
                         iserror = true;
                         loglist[i_count].status = false;
                         loglist[i_count].error =
-                          'Unable to Create Student Account ! Please Try Again.';
+                          'Unable to Generate Student DID ! Please Try Again.';
                         //loglist[i_count].errorlog = {};
                         error_count++;
                       }
-                    } else {
-                      responseArray.push({
-                        error: 'unable to generate student did!',
-                      });
-                      iserror = true;
-                      loglist[i_count].status = false;
-                      loglist[i_count].error =
-                        'Unable to Generate Student DID ! Please Try Again.';
-                      //loglist[i_count].errorlog = {};
-                      error_count++;
                     }
+                  } else {
+                    responseArray.push({
+                      error: 'unable to search student in RC!',
+                    });
+                    iserror = true;
+                    loglist[i_count].status = false;
+                    loglist[i_count].error =
+                      'Unable to Search Student Account ! Please Try Again.';
+                    //loglist[i_count].errorlog = {};
+                    error_count++;
                   }
                 } else {
                   responseArray.push({

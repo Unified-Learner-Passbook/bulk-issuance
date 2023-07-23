@@ -41,5 +41,4 @@ node() {
                 build job: 'SBRC-deploy/deploy-services/deploy-staging/bulk-issurance', parameters: [string(name: 'tag', value: 'dev')]
          }
     }
-    
 }
