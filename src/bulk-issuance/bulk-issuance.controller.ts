@@ -30,15 +30,17 @@ export class BulkIssuanceController {
     const SCHEMA_URL = process.env.SCHEMA_URL;
     const KEYCLOAK_URL = process.env.KEYCLOAK_URL;
     const REGISTRY_URL = process.env.REGISTRY_URL;
+    const LEARNER_SCHEMA_FIELD = process.env.LEARNER_SCHEMA_FIELD;
     const result = {
       success: true,
-      message: 'Bulk Issuance API Working 14 July 23',
+      message: 'Bulk Issuance API Working 23 July 23',
       TESTVAR: TESTVAR,
       CRED_URL: CRED_URL,
       DID_URL: DID_URL,
       SCHEMA_URL: SCHEMA_URL,
       KEYCLOAK_URL: KEYCLOAK_URL,
       REGISTRY_URL: REGISTRY_URL,
+      LEARNER_SCHEMA_FIELD: LEARNER_SCHEMA_FIELD,
     };
     response.status(200).send(result);
   }
@@ -71,6 +73,17 @@ export class BulkIssuanceController {
   }
 
   //get credentials/schema/required
+
+  @Post('/credential/schema/create')
+  async getCredentialSchemaCreate(
+    @Body() postrequest: any,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getCredentialSchemaCreate(
+      postrequest,
+      response,
+    );
+  }
 
   @Post('/credential/schema/list')
   async getCredentialSchemaList(
