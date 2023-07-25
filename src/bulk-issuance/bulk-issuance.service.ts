@@ -160,12 +160,40 @@ export class BulkIssuanceService {
       });
     }
   }
-
+  //getCredentialSchemaCreate
+  async getCredentialSchemaCreate(postrequest: any, response: Response) {
+    if (postrequest) {
+      const getschemacreate = await this.credService.schemaCreate(postrequest);
+      if (getschemacreate?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'get_schema_error',
+          message: 'Get Schema Create Failed ! Please Try Again.',
+          result: getschemacreate,
+        });
+      } else {
+        return response.status(200).send({
+          success: true,
+          status: 'schema_create_success',
+          message: 'Schema Create Success',
+          result: getschemacreate,
+        });
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
   //getCredentialSchemaList
   async getCredentialSchemaList(postrequest: any, response: Response) {
-    if (postrequest?.taglist && postrequest?.taglist.length > 0) {
+    if (postrequest?.taglist) {
+      console.log(postrequest.taglist);
       const getschemalist = await this.credService.schemaList(
-        postrequest?.taglist,
+        '[' + postrequest?.taglist + ']',
       );
       if (getschemalist?.error) {
         return response.status(400).send({
@@ -190,7 +218,7 @@ export class BulkIssuanceService {
             result: schemalist,
           });
         } else {
-          return response.status(400).send({
+          return response.status(200).send({
             success: false,
             status: 'get_schema_list_no_found',
             message: 'Get Schema List Not Found ! Please Change Tags.',
@@ -223,14 +251,12 @@ export class BulkIssuanceService {
         if (getschema?.schema?.required) {
           let schema_fields = getschema?.schema?.properties;
           let required_fileds = getschema?.schema?.required;
-          if (!required_fileds.includes('student_name')) {
-            required_fileds.push('student_name');
-          }
-          if (!required_fileds.includes('dob')) {
-            required_fileds.push('dob');
-          }
-          if (!required_fileds.includes('aadhar_token')) {
-            required_fileds.push('aadhar_token');
+          let learner_schema_field =
+            process.env.LEARNER_SCHEMA_FIELD.split(' ');
+          for (let i = 0; i < learner_schema_field.length; i++) {
+            if (!required_fileds.includes(learner_schema_field[i])) {
+              required_fileds.push(learner_schema_field[i]);
+            }
           }
           let allfields = Object.keys(schema_fields);
           let optional_fileds = [];
@@ -308,18 +334,16 @@ export class BulkIssuanceService {
           //required_fileds
           let required_fileds = getschema?.schema?.required;
           let invite_fileds = [];
-          invite_fileds.push('student_name');
-          invite_fileds.push('dob');
-          invite_fileds.push('aadhar_token');
+          let learner_schema_field =
+            process.env.LEARNER_SCHEMA_FIELD.split(' ');
+          for (let i = 0; i < learner_schema_field.length; i++) {
+            invite_fileds.push(learner_schema_field[i]);
+          }
           let all_imp_fields = required_fileds;
-          if (!all_imp_fields.includes('student_name')) {
-            all_imp_fields.push('student_name');
-          }
-          if (!all_imp_fields.includes('dob')) {
-            all_imp_fields.push('dob');
-          }
-          if (!all_imp_fields.includes('aadhar_token')) {
-            all_imp_fields.push('aadhar_token');
+          for (let i = 0; i < learner_schema_field.length; i++) {
+            if (!all_imp_fields.includes(learner_schema_field[i])) {
+              all_imp_fields.push(learner_schema_field[i]);
+            }
           }
           //register bulk student
           let credentialPlayload = postrequest;
@@ -369,24 +393,40 @@ export class BulkIssuanceService {
                 }
                 //check validation
                 if (valid_data) {
+                  console.log(
+                    'all_schema_properties_fields',
+                    all_schema_properties_fields,
+                  );
+                  console.log('iterator', iterator);
                   let new_iterator = {};
                   for (
                     let i = 0;
                     i < all_schema_properties_fields.length;
                     i++
                   ) {
-                    new_iterator[all_schema_properties_fields[i]] =
-                      iterator[all_schema_properties_fields[i]];
+                    if (iterator[all_schema_properties_fields[i]]) {
+                      new_iterator[all_schema_properties_fields[i]] =
+                        iterator[all_schema_properties_fields[i]];
+                    }
                   }
                   console.log('new_iterator', new_iterator);
                   //generate did or find did
-                  var aadhar_token = iterator.aadhar_token;
+                  var name = iterator.student_name;
+                  var dob = iterator.dob;
+                  var gender = iterator.gender;
+                  var aadhaar_token = iterator.aadhaar_token;
 
                   // find student
                   let searchSchema = {
                     filters: {
-                      aadhar_token: {
-                        eq: aadhar_token,
+                      name: {
+                        eq: name,
+                      },
+                      dob: {
+                        eq: dob,
+                      },
+                      gender: {
+                        eq: gender,
                       },
                     },
                   };
@@ -395,129 +435,13 @@ export class BulkIssuanceService {
                     'Learner',
                   );
                   console.log('Learner Details', studentDetails);
-                  if (studentDetails.length > 0) {
-                    if (studentDetails[0]?.did) {
-                      new_iterator['id'] = studentDetails[0].did;
-                      let obj = {
-                        issuerId: issuerId,
-                        credSchema: schemaRes,
-                        credentialSubject: new_iterator,
-                        issuanceDate: credentialPlayload.vcData.issuanceDate,
-                        expirationDate:
-                          credentialPlayload.vcData.expirationDate,
-                      };
-                      console.log('obj', obj);
-
-                      const cred = await this.credService.issueCredentials(obj);
-                      //console.log("cred 34", cred)
-                      if (cred) {
-                        responseArray.push(cred);
-                        loglist[i_count].status = true;
-                        loglist[i_count].error = {};
-                        success_count++;
-                      } else {
-                        responseArray.push({
-                          error: 'unable to issue credentials!',
-                        });
-                        iserror = true;
-                        loglist[i_count].status = false;
-                        loglist[i_count].error =
-                          'Unable to Issue Credentials ! Please Try Again.';
-                        //loglist[i_count].errorlog = {};
-                        error_count++;
-                      }
-                    } else {
-                      let didRes = await this.credService.generateDid(
-                        aadhar_token,
-                      );
-
-                      if (didRes) {
-                        new_iterator['id'] =
-                          didRes[0].verificationMethod[0].controller;
-                        let updateRes = await this.sbrcService.sbrcUpdate(
-                          { did: iterator.id },
-                          'Learner',
-                          studentDetails[0].osid,
-                        );
-                        if (updateRes) {
-                          let obj = {
-                            issuerId: issuerId,
-                            credSchema: schemaRes,
-                            credentialSubject: new_iterator,
-                            issuanceDate:
-                              credentialPlayload.vcData.issuanceDate,
-                            expirationDate:
-                              credentialPlayload.vcData.expirationDate,
-                          };
-                          console.log('obj', obj);
-
-                          if (new_iterator['id']) {
-                            const cred =
-                              await this.credService.issueCredentials(obj);
-                            //console.log("cred 34", cred)
-                            if (cred) {
-                              responseArray.push(cred);
-                              loglist[i_count].status = true;
-                              loglist[i_count].error = {};
-                              success_count++;
-                            } else {
-                              responseArray.push({
-                                error: 'unable to issue credentials!',
-                              });
-                              iserror = true;
-                              loglist[i_count].status = false;
-                              loglist[i_count].error =
-                                'Unable to Issue Credentials ! Please Try Again.';
-                              //loglist[i_count].errorlog = {};
-                              error_count++;
-                            }
-                          }
-                        } else {
-                          responseArray.push({
-                            error: 'unable to update did inside RC!',
-                          });
-                          iserror = true;
-                          loglist[i_count].status = false;
-                          loglist[i_count].error =
-                            'Unable to Update Student Identity ! Please Try Again.';
-                          //loglist[i_count].errorlog = {};
-                          error_count++;
-                        }
-                      } else {
-                        responseArray.push({
-                          error: 'unable to generate student did!',
-                        });
-                        iserror = true;
-                        loglist[i_count].status = false;
-                        loglist[i_count].error =
-                          'Unable to Generate Student DID ! Please Try Again.';
-                        //loglist[i_count].errorlog = {};
-                        error_count++;
-                      }
-                    }
-                  } else {
-                    let didRes = await this.credService.generateDid(
-                      aadhar_token,
-                    );
-
-                    if (didRes) {
-                      new_iterator['id'] =
-                        didRes[0].verificationMethod[0].controller;
-                      let inviteSchema = {
-                        name: new_iterator['student_name'],
-                        dob: new_iterator['dob'],
-                        did: new_iterator['id'],
-                        username: '',
-                        aadhar_token: new_iterator['aadhar_token'],
-                      };
-                      console.log('inviteSchema', inviteSchema);
-                      let createStudent = await this.sbrcService.sbrcInvite(
-                        inviteSchema,
-                        'Learner',
-                      );
-                      console.log('createStudent', createStudent);
-
-                      if (createStudent) {
+                  if (
+                    typeof studentDetails !== 'undefined' &&
+                    studentDetails !== null
+                  ) {
+                    if (studentDetails.length > 0) {
+                      if (studentDetails[0]?.did) {
+                        new_iterator['id'] = studentDetails[0].did;
                         let obj = {
                           issuerId: issuerId,
                           credSchema: schemaRes,
@@ -549,27 +473,167 @@ export class BulkIssuanceService {
                           error_count++;
                         }
                       } else {
+                        let didRes = await this.credService.generateDid(
+                          aadhaar_token,
+                        );
+                        console.log('did', didRes);
+                        if (didRes) {
+                          new_iterator['id'] =
+                            didRes[0].verificationMethod[0].controller;
+                          let updateRes = await this.sbrcService.sbrcUpdate(
+                            {
+                              did: new_iterator['id'],
+                              aadhaar_token: aadhaar_token,
+                            },
+                            'Learner',
+                            studentDetails[0].osid,
+                          );
+                          if (updateRes) {
+                            let obj = {
+                              issuerId: issuerId,
+                              credSchema: schemaRes,
+                              credentialSubject: new_iterator,
+                              issuanceDate:
+                                credentialPlayload.vcData.issuanceDate,
+                              expirationDate:
+                                credentialPlayload.vcData.expirationDate,
+                            };
+                            console.log('obj', obj);
+
+                            if (new_iterator['id']) {
+                              const cred =
+                                await this.credService.issueCredentials(obj);
+                              //console.log("cred 34", cred)
+                              if (cred) {
+                                responseArray.push(cred);
+                                loglist[i_count].status = true;
+                                loglist[i_count].error = {};
+                                success_count++;
+                              } else {
+                                responseArray.push({
+                                  error: 'unable to issue credentials!',
+                                });
+                                iserror = true;
+                                loglist[i_count].status = false;
+                                loglist[i_count].error =
+                                  'Unable to Issue Credentials ! Please Try Again.';
+                                //loglist[i_count].errorlog = {};
+                                error_count++;
+                              }
+                            }
+                          } else {
+                            responseArray.push({
+                              error: 'unable to update did inside RC!',
+                            });
+                            iserror = true;
+                            loglist[i_count].status = false;
+                            loglist[i_count].error =
+                              'Unable to Update Student Identity ! Please Try Again.';
+                            //loglist[i_count].errorlog = {};
+                            error_count++;
+                          }
+                        } else {
+                          responseArray.push({
+                            error: 'unable to generate student did!',
+                          });
+                          iserror = true;
+                          loglist[i_count].status = false;
+                          loglist[i_count].error =
+                            'Unable to Generate Student DID ! Please Try Again.';
+                          //loglist[i_count].errorlog = {};
+                          error_count++;
+                        }
+                      }
+                    } else {
+                      let didRes = await this.credService.generateDid(
+                        aadhaar_token,
+                      );
+
+                      if (didRes) {
+                        new_iterator['id'] =
+                          didRes[0].verificationMethod[0].controller;
+                        let inviteSchema = {
+                          name: iterator['student_name'],
+                          dob: iterator['dob'],
+                          gender: iterator['gender'],
+                          did: new_iterator['id'],
+                          username: '',
+                          aadhaar_token: iterator['aadhaar_token'],
+                          kyc_aadhaar_token: '',
+                          recoveryphone: '',
+                        };
+                        console.log('inviteSchema', inviteSchema);
+                        let createStudent = await this.sbrcService.sbrcInvite(
+                          inviteSchema,
+                          'Learner',
+                        );
+                        console.log('createStudent', createStudent);
+
+                        if (createStudent) {
+                          let obj = {
+                            issuerId: issuerId,
+                            credSchema: schemaRes,
+                            credentialSubject: new_iterator,
+                            issuanceDate:
+                              credentialPlayload.vcData.issuanceDate,
+                            expirationDate:
+                              credentialPlayload.vcData.expirationDate,
+                          };
+                          console.log('obj', obj);
+
+                          const cred = await this.credService.issueCredentials(
+                            obj,
+                          );
+                          //console.log("cred 34", cred)
+                          if (cred) {
+                            responseArray.push(cred);
+                            loglist[i_count].status = true;
+                            loglist[i_count].error = {};
+                            success_count++;
+                          } else {
+                            responseArray.push({
+                              error: 'unable to issue credentials!',
+                            });
+                            iserror = true;
+                            loglist[i_count].status = false;
+                            loglist[i_count].error =
+                              'Unable to Issue Credentials ! Please Try Again.';
+                            //loglist[i_count].errorlog = {};
+                            error_count++;
+                          }
+                        } else {
+                          responseArray.push({
+                            error: 'unable to create student in RC!',
+                          });
+                          iserror = true;
+                          loglist[i_count].status = false;
+                          loglist[i_count].error =
+                            'Unable to Create Student Account ! Please Try Again.';
+                          //loglist[i_count].errorlog = {};
+                          error_count++;
+                        }
+                      } else {
                         responseArray.push({
-                          error: 'unable to create student in RC!',
+                          error: 'unable to generate student did!',
                         });
                         iserror = true;
                         loglist[i_count].status = false;
                         loglist[i_count].error =
-                          'Unable to Create Student Account ! Please Try Again.';
+                          'Unable to Generate Student DID ! Please Try Again.';
                         //loglist[i_count].errorlog = {};
                         error_count++;
                       }
-                    } else {
-                      responseArray.push({
-                        error: 'unable to generate student did!',
-                      });
-                      iserror = true;
-                      loglist[i_count].status = false;
-                      loglist[i_count].error =
-                        'Unable to Generate Student DID ! Please Try Again.';
-                      //loglist[i_count].errorlog = {};
-                      error_count++;
                     }
+                  } else {
+                    responseArray.push({
+                      error: 'unable to search student in RC!',
+                    });
+                    iserror = true;
+                    loglist[i_count].status = false;
+                    loglist[i_count].error =
+                      'Unable to Search Student Account ! Please Try Again.';
+                    //loglist[i_count].errorlog = {};
+                    error_count++;
                   }
                 } else {
                   responseArray.push({
@@ -619,6 +683,228 @@ export class BulkIssuanceService {
             result: null,
           });
         }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getUserCreate
+  async getUserCreate(postrequest: any, response: Response) {
+    if (
+      postrequest?.name &&
+      postrequest?.dob &&
+      postrequest?.gender &&
+      postrequest?.recoveryphone &&
+      postrequest?.username &&
+      postrequest?.password &&
+      postrequest?.aadhaar_token
+    ) {
+      let name = postrequest.name;
+      let dob = postrequest.dob;
+      let gender = postrequest.gender;
+      let recoveryphone = postrequest.recoveryphone;
+      let username = postrequest.username;
+      let password = postrequest.password;
+      let aadhaar_token = postrequest.aadhaar_token;
+      // find student
+      let searchSchema = {
+        filters: {
+          name: {
+            eq: name,
+          },
+          dob: {
+            eq: dob,
+          },
+          gender: {
+            eq: gender,
+          },
+        },
+      };
+      const studentDetails = await this.sbrcService.sbrcSearch(
+        searchSchema,
+        'Learner',
+      );
+      console.log('Learner Details', studentDetails);
+      if (studentDetails.length == 0) {
+        //register in keycloak and then in sunbird rc
+        //create keycloak and then login
+        const clientToken = await this.keycloakService.getClientToken();
+        console.log('clientToken', clientToken);
+        if (clientToken?.error) {
+          return response.status(401).send({
+            success: false,
+            status: 'keycloak_client_token_error',
+            message: 'System Authentication Failed ! Please Try Again.',
+            result: null,
+          });
+        } else {
+          ///register in keycloak
+          let response_text = await this.keycloakService.registerUserKeycloak(
+            username,
+            password,
+            clientToken,
+          );
+          console.log('registerUserKeycloak', response_text);
+          if (response_text?.error) {
+            return response.status(400).send({
+              success: false,
+              status: 'keycloak_register_duplicate',
+              message:
+                'You entered username Account Already Present in Keycloak.',
+              result: null,
+            });
+          } else {
+            //register and create account in sunbird rc
+            let inviteSchema = {
+              name: name,
+              dob: dob,
+              gender: gender,
+              did: '',
+              username: username,
+              aadhaar_token: '',
+              kyc_aadhaar_token: aadhaar_token,
+              recoveryphone: recoveryphone,
+            };
+            console.log('inviteSchema', inviteSchema);
+            let createStudent = await this.sbrcService.sbrcInvite(
+              inviteSchema,
+              'Learner',
+            );
+            console.log('createStudent', createStudent);
+            if (createStudent) {
+              return response.status(200).send({
+                success: true,
+                status: 'sbrc_register_success',
+                message: 'User Account Registered. Complete Aadhar KYC.',
+                needkyc: true,
+                result: null,
+              });
+            } else {
+              //need to add rollback function for keycloak user delete
+              let response_text_keycloak =
+                await this.keycloakService.deleteUserKeycloak(
+                  username,
+                  clientToken,
+                );
+              if (response_text_keycloak?.error) {
+                return response.status(400).send({
+                  success: false,
+                  status: 'sbrc_invite_error_delete_keycloak',
+                  message: 'Unable to Register Learner. Try Again.',
+                  result: null,
+                });
+              } else {
+                return response.status(400).send({
+                  success: false,
+                  status: 'sbrc_invite_error',
+                  message: 'Unable to Register Learner. Try Again.',
+                  result: null,
+                });
+              }
+            }
+          }
+        }
+      } else if (studentDetails.length > 0) {
+        if (studentDetails[0].username != '') {
+          return response.status(400).send({
+            success: false,
+            status: 'sbrc_register_duplicate',
+            message: `You entered account details already linked to an existing Keycloak account, which has a username ${studentDetails[0].username}. You cannot set a new username for this account detail. Login using the linked username and password.`,
+            result: null,
+          });
+        } else {
+          //register in keycloak and then update username
+          //register in keycloak
+          //create keycloak and then login
+          const clientToken = await this.keycloakService.getClientToken();
+          if (clientToken?.error) {
+            return response.status(401).send({
+              success: false,
+              status: 'keycloak_client_token_error',
+              message: 'System Authentication Failed ! Please Try Again.',
+              result: null,
+            });
+          } else {
+            ///register in keycloak
+            let response_text = await this.keycloakService.registerUserKeycloak(
+              username,
+              password,
+              clientToken,
+            );
+            if (response_text?.error) {
+              return response.status(400).send({
+                success: false,
+                status: 'keycloak_register_duplicate',
+                message:
+                  'You entered username Account Already Present in Keycloak.',
+                result: null,
+              });
+            } else {
+              //update username and register in keycloak
+              //update username
+              let updateRes = await this.sbrcService.sbrcUpdate(
+                { username: username, kyc_aadhaar_token: aadhaar_token },
+                'Learner',
+                studentDetails[0].osid,
+              );
+              if (updateRes) {
+                if (studentDetails[0].kyc_aadhaar_token == '') {
+                  return response.status(200).send({
+                    success: true,
+                    status: 'sbrc_register_success',
+                    message: 'User Account Registered. Complete Aadhar KYC.',
+                    needkyc: true,
+                    result: null,
+                  });
+                } else {
+                  return response.status(200).send({
+                    success: true,
+                    status: 'sbrc_register_success',
+                    message:
+                      'User Account Registered. Login using username and password.',
+                    result: null,
+                  });
+                }
+              } else {
+                //need to add rollback function for keycloak user delete
+                let response_text_keycloak =
+                  await this.keycloakService.deleteUserKeycloak(
+                    username,
+                    clientToken,
+                  );
+                if (response_text_keycloak?.error) {
+                  return response.status(400).send({
+                    success: false,
+                    status: 'sbrc_invite_error_delete_keycloak',
+                    message: 'Unable to Register Learner. Try Again.',
+                    result: null,
+                  });
+                } else {
+                  return response.status(200).send({
+                    success: false,
+                    status: 'sbrc_update_error',
+                    message:
+                      'Unable to Update Learner Username ! Please Try Again.',
+                    result: null,
+                  });
+                }
+              }
+            }
+          }
+        }
+      } else {
+        return response.status(200).send({
+          success: false,
+          status: 'sbrc_search_error',
+          message: 'Unable to search Learner. Try Again.',
+          result: null,
+        });
       }
     } else {
       return response.status(400).send({
