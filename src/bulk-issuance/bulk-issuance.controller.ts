@@ -66,10 +66,27 @@ export class BulkIssuanceController {
     @Headers('Authorization') auth: string,
     @Body('name') name: string,
     @Body('did') did: string,
+    @Body('username') username: string,
+    @Body('password') password: string,
     @Res() response: Response,
   ) {
     const jwt = auth.replace('Bearer ', '');
-    return this.bulkIssuanceService.getIssuerRegister(jwt, name, did, response);
+    return this.bulkIssuanceService.getIssuerRegister(
+      jwt,
+      name,
+      did,
+      username,
+      password,
+      response,
+    );
+  }
+  @Get('/issuerdetail')
+  async getDetailIssuer(
+    @Headers('Authorization') auth: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailIssuer(jwt, response);
   }
 
   //get credentials/schema/required
@@ -113,10 +130,7 @@ export class BulkIssuanceController {
   }
 
   @Post('/user/create')
-  async getUserCreate(
-    @Body() postrequest: any,
-    @Res() response: Response,
-  ) {
+  async getUserCreate(@Body() postrequest: any, @Res() response: Response) {
     return this.bulkIssuanceService.getUserCreate(postrequest, response);
   }
 
