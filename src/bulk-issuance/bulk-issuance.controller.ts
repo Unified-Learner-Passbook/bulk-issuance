@@ -80,7 +80,7 @@ export class BulkIssuanceController {
       response,
     );
   }
-  
+
   @Get('/issuerdetail')
   async getDetailIssuer(
     @Headers('Authorization') auth: string,
@@ -94,6 +94,35 @@ export class BulkIssuanceController {
   async getListIssuer(@Res() response: Response) {
     return this.bulkIssuanceService.getListIssuer(response);
   }
+
+  //instructor
+  @Post('/instructor/register')
+  async registerInstructor(
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Body('recoveryphone') recoveryphone: string,
+    @Body('issuer_did') issuer_did: string,
+    @Body('school_name') school_name: string,
+    @Body('school_id') school_id: string,
+    @Body('username') username: string,
+    @Body('password') password: string,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.registerInstructor(
+      name,
+      dob,
+      gender,
+      recoveryphone,
+      issuer_did,
+      school_name,
+      school_id,
+      username,
+      password,
+      response,
+    );
+  }
+
 
   //get credentials/schema/required
 
