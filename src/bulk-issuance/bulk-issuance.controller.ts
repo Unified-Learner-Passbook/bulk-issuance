@@ -80,6 +80,7 @@ export class BulkIssuanceController {
       response,
     );
   }
+  
   @Get('/issuerdetail')
   async getDetailIssuer(
     @Headers('Authorization') auth: string,

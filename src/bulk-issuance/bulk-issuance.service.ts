@@ -332,6 +332,7 @@ export class BulkIssuanceService {
       });
     }
   }
+  
   //getListIssuer
   async getListIssuer(response: Response) {
     const sb_rc_search = await this.sbrcService.sbrcSearchEL('Issuer', {
@@ -367,6 +368,7 @@ export class BulkIssuanceService {
       });
     }
   }
+  
   //getCredentialSchemaCreate
   async getCredentialSchemaCreate(postrequest: any, response: Response) {
     if (postrequest) {
