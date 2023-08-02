@@ -96,6 +96,7 @@ export class BulkIssuanceController {
   }
 
   //instructor
+  //register
   @Post('/instructor/register')
   async registerInstructor(
     @Body('name') name: string,
@@ -122,10 +123,51 @@ export class BulkIssuanceController {
       response,
     );
   }
-
+  //aadhaar
+  @Post('/instructor/aadhaar')
+  async getAadhaarToken(
+    @Res() response: Response,
+    @Body('aadhaar_id') aadhaar_id: string,
+    @Body('aadhaar_name') aadhaar_name: string,
+    @Body('aadhaar_dob') aadhaar_dob: string,
+    @Body('aadhaar_gender') aadhaar_gender: string,
+  ) {
+    return this.bulkIssuanceService.getAadhaarTokenUpdate(
+      response,
+      aadhaar_id,
+      aadhaar_name,
+      aadhaar_dob,
+      aadhaar_gender,
+    );
+  }
+  //get details
+  @Get('/instructor/getdetail')
+  async getDetailInstructor(
+    @Headers('Authorization') auth: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailInstructor(jwt, response);
+  }
+  @Post('/instructor/digi/getdetail')
+  async getDetailDigiInstructor(
+    @Headers('Authorization') auth: string,
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailDigiInstructor(
+      jwt,
+      name,
+      dob,
+      gender,
+      response,
+    );
+  }
 
   //get credentials/schema/required
-
   @Post('/credential/schema/create')
   async getCredentialSchemaCreate(
     @Body() postrequest: any,

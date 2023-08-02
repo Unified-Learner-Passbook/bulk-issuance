@@ -5,6 +5,7 @@ import { Response } from 'express';
 import { CredentialsService } from 'src/services/credentials/credentials.service';
 import { SbrcService } from 'src/services/sbrc/sbrc.service';
 import { TelemetryService } from 'src/services/telemetry/telemetry.service';
+import { AadharService } from 'src/services/aadhar/aadhar.service';
 import { KeycloakService } from 'src/services/keycloak/keycloak.service';
 import jwt_decode from 'jwt-decode';
 import { UsersService } from 'src/services/users/users.service';
@@ -16,6 +17,7 @@ export class BulkIssuanceService {
     private credService: CredentialsService,
     private sbrcService: SbrcService,
     private telemetryService: TelemetryService,
+    private aadharService: AadharService,
     private keycloakService: KeycloakService,
     private readonly httpService: HttpService,
     private usersService: UsersService,
@@ -626,6 +628,253 @@ export class BulkIssuanceService {
         success: false,
         status: 'invalid_request',
         message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getAadhaarTokenUpdate
+  async getAadhaarTokenUpdate(
+    response: Response,
+    aadhaar_id: string,
+    aadhaar_name: string,
+    aadhaar_dob: string,
+    aadhaar_gender: string,
+  ) {
+    if (aadhaar_id && aadhaar_name && aadhaar_dob && aadhaar_gender) {
+      const aadhar_data = await this.aadharService.aadhaarDemographic(
+        aadhaar_id,
+        aadhaar_name,
+        aadhaar_dob,
+        aadhaar_gender,
+      );
+      //console.log(aadhar_data);
+      if (!aadhar_data?.success === true) {
+        return response.status(400).send({
+          success: false,
+          status: 'aadhaar_api_error',
+          message: 'Aadhar API Not Working',
+          result: aadhar_data?.result,
+        });
+      } else {
+        if (aadhar_data?.result?.ret === 'y') {
+          const decodedxml = aadhar_data?.decodedxml;
+          const uuid = await this.aadharService.getUUID(decodedxml);
+          if (uuid === null) {
+            return response.status(400).send({
+              success: false,
+              status: 'aadhaar_api_uuid_error',
+              message: 'Aadhar API UUID Not Found',
+              result: uuid,
+            });
+          } else {
+            //update uuid in user data
+            // find student
+            let searchSchema = {
+              filters: {
+                name: {
+                  eq: aadhaar_name,
+                },
+                dob: {
+                  eq: aadhaar_dob,
+                },
+                gender: {
+                  eq: aadhaar_gender,
+                },
+              },
+            };
+            const instructorDetails = await this.sbrcService.sbrcSearch(
+              searchSchema,
+              'Instructor',
+            );
+            console.log('Instructor Details', instructorDetails);
+            if (instructorDetails.length == 0) {
+              //register in keycloak and then in sunbird rc
+              return response.status(400).send({
+                success: false,
+                status: 'sbrc_instructor_no_found_error',
+                message:
+                  'Instructor Account Not Found. Register and Try Again.',
+                result: null,
+              });
+            } else if (instructorDetails.length > 0) {
+              //update kyc aadhar token
+              //update username
+              let updateRes = await this.sbrcService.sbrcUpdate(
+                { kyc_aadhaar_token: uuid },
+                'Instructor',
+                instructorDetails[0].osid,
+              );
+              if (updateRes) {
+                return response.status(200).send({
+                  success: true,
+                  status: 'aadhaar_api_success',
+                  message: 'Aadhar API Working',
+                  result: null,
+                });
+              } else {
+                return response.status(200).send({
+                  success: false,
+                  status: 'sbrc_update_error',
+                  message:
+                    'Unable to Update Instructor Aadhaar KYC Token ! Please Try Again.',
+                  result: null,
+                });
+              }
+            } else {
+              return response.status(200).send({
+                success: false,
+                status: 'sbrc_search_error',
+                message: 'Unable to search Learner. Try Again.',
+                result: null,
+              });
+            }
+          }
+        } else {
+          return response.status(200).send({
+            success: false,
+            status: 'invalid_aadhaar',
+            message: 'Invalid Aadhaar',
+            result: null,
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //get detail
+  //getDetailInstructor
+  async getDetailInstructor(token: string, response: Response) {
+    if (token) {
+      const instructorUsername = await this.keycloakService.verifyUserToken(token);
+      if (instructorUsername?.error) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_bad_request',
+          message: 'You do not have access for this request.',
+          result: null,
+        });
+      } else if (!instructorUsername?.preferred_username) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_error',
+          message: 'Your Login Session Expired.',
+          result: null,
+        });
+      } else {
+        const sb_rc_search = await this.sbrcService.sbrcSearchEL('Instructor', {
+          filters: {
+            username: {
+              eq: instructorUsername?.preferred_username,
+            },
+          },
+        });
+        if (sb_rc_search?.error) {
+          return response.status(501).send({
+            success: false,
+            status: 'sb_rc_search_error',
+            message: 'System Search Error ! Please try again.',
+            result: sb_rc_search?.error.message,
+          });
+        } else if (sb_rc_search.length === 0) {
+          return response.status(404).send({
+            success: false,
+            status: 'sb_rc_search_no_found',
+            message: 'Data Not Found in System.',
+            result: null,
+          });
+        } else {
+          return response.status(200).send({
+            success: true,
+            status: 'sb_rc_search_found',
+            message: 'Data Found in System.',
+            result: sb_rc_search[0],
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received token.',
+        result: null,
+      });
+    }
+  }
+
+  //getDetailDigiInstructor
+  async getDetailDigiInstructor(
+    token: string,
+    name: string,
+    dob: string,
+    gender: string,
+    response: Response,
+  ) {
+    if (token && name && dob && gender) {
+      const instructorUsername = await this.keycloakService.verifyUserToken(token);
+      if (instructorUsername?.error) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_bad_request',
+          message: 'You do not have access for this request.',
+          result: null,
+        });
+      } else if (!instructorUsername?.preferred_username) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_error',
+          message: 'Your Login Session Expired.',
+          result: null,
+        });
+      } else {
+        const sb_rc_search = await this.sbrcService.sbrcSearchEL('Instructor', {
+          filters: {
+            name: {
+              eq: name,
+            },
+            dob: {
+              eq: dob,
+            },
+            gender: {
+              eq: gender,
+            },
+          },
+        });
+        if (sb_rc_search?.error) {
+          return response.status(501).send({
+            success: false,
+            status: 'sb_rc_search_error',
+            message: 'System Search Error ! Please try again.',
+            result: sb_rc_search?.error.message,
+          });
+        } else if (sb_rc_search.length === 0) {
+          return response.status(404).send({
+            success: false,
+            status: 'sb_rc_search_no_found',
+            message: 'Data Not Found in System.',
+            result: null,
+          });
+        } else {
+          return response.status(200).send({
+            success: true,
+            status: 'sb_rc_search_found',
+            message: 'Data Found in System.',
+            result: sb_rc_search[0],
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received token.',
         result: null,
       });
     }
