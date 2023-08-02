@@ -80,6 +80,7 @@ export class BulkIssuanceController {
       response,
     );
   }
+  
   @Get('/issuerdetail')
   async getDetailIssuer(
     @Headers('Authorization') auth: string,
@@ -87,6 +88,11 @@ export class BulkIssuanceController {
   ) {
     const jwt = auth.replace('Bearer ', '');
     return this.bulkIssuanceService.getDetailIssuer(jwt, response);
+  }
+
+  @Get('/issuerlist')
+  async getListIssuer(@Res() response: Response) {
+    return this.bulkIssuanceService.getListIssuer(response);
   }
 
   //get credentials/schema/required
