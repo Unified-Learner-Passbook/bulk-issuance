@@ -332,7 +332,41 @@ export class BulkIssuanceService {
       });
     }
   }
-
+  //getListIssuer
+  async getListIssuer(response: Response) {
+    const sb_rc_search = await this.sbrcService.sbrcSearchEL('Issuer', {
+      filters: {},
+    });
+    if (sb_rc_search?.error) {
+      return response.status(501).send({
+        success: false,
+        status: 'sb_rc_search_error',
+        message: 'System Search Error ! Please try again.',
+        result: sb_rc_search?.error.message,
+      });
+    } else if (sb_rc_search.length === 0) {
+      return response.status(404).send({
+        success: false,
+        status: 'sb_rc_search_no_found',
+        message: 'Data Not Found in System.',
+        result: null,
+      });
+    } else {
+      let issuer_detail = [];
+      for (let i = 0; i < sb_rc_search.length; i++) {
+        issuer_detail.push({
+          name: sb_rc_search[i].name,
+          did: sb_rc_search[i].did,
+        });
+      }
+      return response.status(200).send({
+        success: true,
+        status: 'sb_rc_search_found',
+        message: 'Data Found in System.',
+        result: issuer_detail,
+      });
+    }
+  }
   //getCredentialSchemaCreate
   async getCredentialSchemaCreate(postrequest: any, response: Response) {
     if (postrequest) {

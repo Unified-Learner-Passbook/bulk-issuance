@@ -89,6 +89,11 @@ export class BulkIssuanceController {
     return this.bulkIssuanceService.getDetailIssuer(jwt, response);
   }
 
+  @Get('/issuerlist')
+  async getListIssuer(@Res() response: Response) {
+    return this.bulkIssuanceService.getListIssuer(response);
+  }
+
   //get credentials/schema/required
 
   @Post('/credential/schema/create')
