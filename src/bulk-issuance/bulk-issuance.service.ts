@@ -956,6 +956,79 @@ export class BulkIssuanceService {
     }
   }
 
+  //getCredentialSchemaTemplateCreate
+  async getCredentialSchemaTemplateCreate(postrequest: any, response: Response) {
+    if (postrequest) {
+      const getschematemplatecreate = await this.credService.schemaTemplateCreate(postrequest);
+      if (getschematemplatecreate?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'get_schema_template_error',
+          message: 'Get Schema Template Create Failed ! Please Try Again.',
+          result: getschematemplatecreate,
+        });
+      } else {
+        return response.status(200).send({
+          success: true,
+          status: 'schema_template_create_success',
+          message: 'Schema Template Create Success',
+          result: getschematemplatecreate,
+        });
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+  //getCredentialSchemaTemplateList
+  async getCredentialSchemaTemplateList(postrequest: any, response: Response) {
+    if (postrequest?.schema_id) {
+      console.log(postrequest.schema_id);
+      const getschematemplatelist = await this.credService.schemaTemplateList(
+        postrequest?.schema_id ,
+      );
+      if (getschematemplatelist?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'get_schema_error',
+          message: 'Get Schema Template List Failed ! Please Try Again.',
+          result: getschematemplatelist,
+        });
+      } else {
+        if (getschematemplatelist.length > 0) {
+          let schematemplatelist = [];
+          for (let i = 0; i < getschematemplatelist.length; i++) {
+            schematemplatelist.push(getschematemplatelist[i]);
+          }
+          return response.status(200).send({
+            success: true,
+            status: 'schema_template_list_success',
+            message: 'Schema Template List Success',
+            result: schematemplatelist,
+          });
+        } else {
+          return response.status(200).send({
+            success: false,
+            status: 'get_schema_template_list_no_found',
+            message: 'Get Schema Template List Not Found !',
+            result: getschematemplatelist,
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
   //getSchemaFields
   async getSchemaFields(schema_id: string, response: Response) {
     if (schema_id) {
