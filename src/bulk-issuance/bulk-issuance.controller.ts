@@ -190,6 +190,29 @@ export class BulkIssuanceController {
     );
   }
 
+  //schema template create
+  @Post('/credential/schema/template/create')
+  async getCredentialSchemaTemplateCreate(
+    @Body() postrequest: any,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getCredentialSchemaTemplateCreate(
+      postrequest,
+      response,
+    );
+  }
+
+  @Post('/credential/schema/template/list')
+  async getCredentialSchemaTemplateList(
+    @Body() postrequest: any,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getCredentialSchemaTemplateList(
+      postrequest,
+      response,
+    );
+  }
+
   @Post('/credential/schema/fields')
   async getSchemaFields(
     @Body('schema_id') schema_id: string,
