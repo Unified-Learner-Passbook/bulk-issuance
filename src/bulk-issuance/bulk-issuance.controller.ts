@@ -66,14 +66,108 @@ export class BulkIssuanceController {
     @Headers('Authorization') auth: string,
     @Body('name') name: string,
     @Body('did') did: string,
+    @Body('username') username: string,
+    @Body('password') password: string,
     @Res() response: Response,
   ) {
     const jwt = auth.replace('Bearer ', '');
-    return this.bulkIssuanceService.getIssuerRegister(jwt, name, did, response);
+    return this.bulkIssuanceService.getIssuerRegister(
+      jwt,
+      name,
+      did,
+      username,
+      password,
+      response,
+    );
+  }
+
+  @Get('/issuerdetail')
+  async getDetailIssuer(
+    @Headers('Authorization') auth: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailIssuer(jwt, response);
+  }
+
+  @Get('/issuerlist')
+  async getListIssuer(@Res() response: Response) {
+    return this.bulkIssuanceService.getListIssuer(response);
+  }
+
+  //instructor
+  //register
+  @Post('/instructor/register')
+  async registerInstructor(
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Body('recoveryphone') recoveryphone: string,
+    @Body('issuer_did') issuer_did: string,
+    @Body('school_name') school_name: string,
+    @Body('school_id') school_id: string,
+    @Body('username') username: string,
+    @Body('kyc_aadhaar_token') kyc_aadhaar_token: string,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.registerInstructor(
+      name,
+      dob,
+      gender,
+      recoveryphone,
+      issuer_did,
+      school_name,
+      school_id,
+      username,
+      kyc_aadhaar_token,
+      response,
+    );
+  }
+  //aadhaar
+  @Post('/instructor/aadhaar')
+  async getAadhaarToken(
+    @Res() response: Response,
+    @Body('aadhaar_id') aadhaar_id: string,
+    @Body('aadhaar_name') aadhaar_name: string,
+    @Body('aadhaar_dob') aadhaar_dob: string,
+    @Body('aadhaar_gender') aadhaar_gender: string,
+  ) {
+    return this.bulkIssuanceService.getAadhaarTokenUpdate(
+      response,
+      aadhaar_id,
+      aadhaar_name,
+      aadhaar_dob,
+      aadhaar_gender,
+    );
+  }
+  //get details
+  @Get('/instructor/getdetail')
+  async getDetailInstructor(
+    @Headers('Authorization') auth: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailInstructor(jwt, response);
+  }
+  @Post('/instructor/digi/getdetail')
+  async getDetailDigiInstructor(
+    @Headers('Authorization') auth: string,
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailDigiInstructor(
+      jwt,
+      name,
+      dob,
+      gender,
+      response,
+    );
   }
 
   //get credentials/schema/required
-
   @Post('/credential/schema/create')
   async getCredentialSchemaCreate(
     @Body() postrequest: any,
@@ -96,6 +190,29 @@ export class BulkIssuanceController {
     );
   }
 
+  //schema template create
+  @Post('/credential/schema/template/create')
+  async getCredentialSchemaTemplateCreate(
+    @Body() postrequest: any,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getCredentialSchemaTemplateCreate(
+      postrequest,
+      response,
+    );
+  }
+
+  @Post('/credential/schema/template/list')
+  async getCredentialSchemaTemplateList(
+    @Body() postrequest: any,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.getCredentialSchemaTemplateList(
+      postrequest,
+      response,
+    );
+  }
+
   @Post('/credential/schema/fields')
   async getSchemaFields(
     @Body('schema_id') schema_id: string,
@@ -113,10 +230,7 @@ export class BulkIssuanceController {
   }
 
   @Post('/user/create')
-  async getUserCreate(
-    @Body() postrequest: any,
-    @Res() response: Response,
-  ) {
+  async getUserCreate(@Body() postrequest: any, @Res() response: Response) {
     return this.bulkIssuanceService.getUserCreate(postrequest, response);
   }
 

@@ -5,6 +5,7 @@ import { Response } from 'express';
 import { CredentialsService } from 'src/services/credentials/credentials.service';
 import { SbrcService } from 'src/services/sbrc/sbrc.service';
 import { TelemetryService } from 'src/services/telemetry/telemetry.service';
+import { AadharService } from 'src/services/aadhar/aadhar.service';
 import { KeycloakService } from 'src/services/keycloak/keycloak.service';
 import jwt_decode from 'jwt-decode';
 import { UsersService } from 'src/services/users/users.service';
@@ -16,6 +17,7 @@ export class BulkIssuanceService {
     private credService: CredentialsService,
     private sbrcService: SbrcService,
     private telemetryService: TelemetryService,
+    private aadharService: AadharService,
     private keycloakService: KeycloakService,
     private readonly httpService: HttpService,
     private usersService: UsersService,
@@ -74,74 +76,187 @@ export class BulkIssuanceService {
     token: string,
     name: string,
     did: string,
+    username: string,
+    password: string,
     response: Response,
   ) {
-    if (token && name && did) {
+    if (token && name && did && username && password) {
       let jwt_decode = await this.parseJwt(token);
       let clientId = jwt_decode?.clientId ? jwt_decode.clientId : [];
       //check admin roles in jwt
       if (clientId === process.env.KEYCLOAK_CLIENT_ID) {
-        //check keycloak token
-        const tokenUsername = await this.keycloakService.verifyUserToken(token);
-        if (tokenUsername?.error) {
-          return response.status(401).send({
-            success: false,
-            status: 'keycloak_token_bad_request',
-            message: 'You do not have access for this request.',
-            result: null,
-          });
-        } else if (!tokenUsername?.preferred_username) {
-          return response.status(400).send({
-            success: false,
-            status: 'keycloak_token_error',
-            message: 'Your Login Session Expired.',
-            result: null,
-          });
-        } else {
-          let data = JSON.stringify({
-            name: name,
-            did: did,
-          });
-          const url = process.env.REGISTRY_URL + 'api/v1/Issuer/invite';
-          const config: AxiosRequestConfig = {
-            headers: {
-              'content-type': 'application/json',
-              Authorization: 'Bearer ' + token,
+        // find student
+        let searchSchema = {
+          filters: {
+            did: {
+              eq: did,
             },
-          };
-          var sb_rc_response_text = null;
-          try {
-            const observable = this.httpService.post(url, data, config);
-            const promise = observable.toPromise();
-            const response = await promise;
-            //console.log(JSON.stringify(response.data));
-            sb_rc_response_text = response.data;
-          } catch (e) {
-            //console.log(e);
-            sb_rc_response_text = { error: e };
-          }
-          if (sb_rc_response_text?.error) {
-            return response.status(400).send({
+          },
+        };
+        const issuerDetails = await this.sbrcService.sbrcSearch(
+          searchSchema,
+          'Issuer',
+        );
+        console.log('Issuer Details', issuerDetails);
+        if (issuerDetails.length == 0) {
+          //register in keycloak and then in sunbird rc
+          //create keycloak and then login
+          const clientToken = await this.keycloakService.getClientToken();
+          console.log('clientToken', clientToken);
+          if (clientToken?.error) {
+            return response.status(401).send({
               success: false,
-              status: 'sb_rc_register_error',
-              message: 'System Register Error ! Please try again.',
-              result: sb_rc_response_text?.error,
-            });
-          } else if (sb_rc_response_text?.params?.status === 'SUCCESSFUL') {
-            return response.status(200).send({
-              success: true,
-              status: 'issuer_register',
-              message: 'Issuer Registered',
-              result: sb_rc_response_text,
+              status: 'keycloak_client_token_error',
+              message: 'System Authentication Failed ! Please Try Again.',
+              result: null,
             });
           } else {
+            ///register in keycloak
+            let response_text = await this.keycloakService.registerUserKeycloak(
+              username,
+              password,
+              clientToken,
+            );
+            console.log('registerUserKeycloak', response_text);
+            if (response_text?.error) {
+              return response.status(400).send({
+                success: false,
+                status: 'keycloak_register_duplicate',
+                message:
+                  'You entered username Account Already Present in Keycloak.',
+                result: null,
+              });
+            } else {
+              //register and create account in sunbird rc
+              let inviteSchema = {
+                name: name,
+                did: did,
+                username: username,
+              };
+              console.log('inviteSchema', inviteSchema);
+              let createIssuer = await this.sbrcService.sbrcInvite(
+                inviteSchema,
+                'Issuer',
+              );
+              console.log('createIssuer', createIssuer);
+              if (createIssuer) {
+                return response.status(200).send({
+                  success: true,
+                  status: 'sbrc_register_success',
+                  message: 'Issuer Account Registered. Complete Aadhar KYC.',
+                  result: null,
+                });
+              } else {
+                //need to add rollback function for keycloak user delete
+                let response_text_keycloak =
+                  await this.keycloakService.deleteUserKeycloak(
+                    username,
+                    clientToken,
+                  );
+                if (response_text_keycloak?.error) {
+                  return response.status(400).send({
+                    success: false,
+                    status: 'sbrc_invite_error_delete_keycloak',
+                    message: 'Unable to Register Issuer. Try Again.',
+                    result: null,
+                  });
+                } else {
+                  return response.status(400).send({
+                    success: false,
+                    status: 'sbrc_invite_error',
+                    message: 'Unable to Register Issuer. Try Again.',
+                    result: null,
+                  });
+                }
+              }
+            }
+          }
+        } else if (issuerDetails.length > 0) {
+          if (issuerDetails[0].username != '') {
             return response.status(400).send({
               success: false,
-              status: 'sb_rc_register_duplicate',
-              message: 'Duplicate Data Found.',
-              result: sb_rc_response_text,
+              status: 'sbrc_register_duplicate',
+              message: `You entered DID account details already linked to an existing Keycloak account, which has a username ${issuerDetails[0].username}. You cannot set a new username for this account detail. Login using the linked username and password.`,
+              result: null,
             });
+          } else {
+            //register in keycloak and then update username
+            //register in keycloak
+            //create keycloak and then login
+            const clientToken = await this.keycloakService.getClientToken();
+            if (clientToken?.error) {
+              return response.status(401).send({
+                success: false,
+                status: 'keycloak_client_token_error',
+                message: 'System Authentication Failed ! Please Try Again.',
+                result: null,
+              });
+            } else {
+              ///register in keycloak
+              let response_text =
+                await this.keycloakService.registerUserKeycloak(
+                  username,
+                  password,
+                  clientToken,
+                );
+              if (response_text?.error) {
+                return response.status(400).send({
+                  success: false,
+                  status: 'keycloak_register_duplicate',
+                  message:
+                    'You entered username Account Already Present in Keycloak.',
+                  result: null,
+                });
+              } else {
+                //update username and register in keycloak
+                //update username
+                let updateRes = await this.sbrcService.sbrcUpdate(
+                  { username: username },
+                  'Issuer',
+                  issuerDetails[0].osid,
+                );
+                if (updateRes) {
+                  return response.status(200).send({
+                    success: true,
+                    status: 'sbrc_register_success',
+                    message:
+                      'Issuer Account Registered. Login using username and password.',
+                    result: null,
+                  });
+                } else {
+                  //need to add rollback function for keycloak user delete
+                  let response_text_keycloak =
+                    await this.keycloakService.deleteUserKeycloak(
+                      username,
+                      clientToken,
+                    );
+                  if (response_text_keycloak?.error) {
+                    return response.status(400).send({
+                      success: false,
+                      status: 'sbrc_invite_error_delete_keycloak',
+                      message: 'Unable to Register Issuer. Try Again.',
+                      result: null,
+                    });
+                  } else {
+                    return response.status(200).send({
+                      success: false,
+                      status: 'sbrc_update_error',
+                      message:
+                        'Unable to Update Issuer Username ! Please Try Again.',
+                      result: null,
+                    });
+                  }
+                }
+              }
+            }
           }
+        } else {
+          return response.status(200).send({
+            success: false,
+            status: 'sbrc_search_error',
+            message: 'Unable to search Issuer. Try Again.',
+            result: null,
+          });
         }
       } else {
         return response.status(400).send({
@@ -160,6 +275,537 @@ export class BulkIssuanceService {
       });
     }
   }
+
+  //getDetailLearner
+  async getDetailIssuer(token: string, response: Response) {
+    if (token) {
+      const studentUsername = await this.keycloakService.verifyUserToken(token);
+      if (studentUsername?.error) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_bad_request',
+          message: 'You do not have access for this request.',
+          result: null,
+        });
+      } else if (!studentUsername?.preferred_username) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_error',
+          message: 'Your Login Session Expired.',
+          result: null,
+        });
+      } else {
+        const sb_rc_search = await this.sbrcService.sbrcSearchEL('Issuer', {
+          filters: {
+            username: {
+              eq: studentUsername?.preferred_username,
+            },
+          },
+        });
+        if (sb_rc_search?.error) {
+          return response.status(501).send({
+            success: false,
+            status: 'sb_rc_search_error',
+            message: 'System Search Error ! Please try again.',
+            result: sb_rc_search?.error.message,
+          });
+        } else if (sb_rc_search.length === 0) {
+          return response.status(404).send({
+            success: false,
+            status: 'sb_rc_search_no_found',
+            message: 'Data Not Found in System.',
+            result: null,
+          });
+        } else {
+          return response.status(200).send({
+            success: true,
+            status: 'sb_rc_search_found',
+            message: 'Data Found in System.',
+            result: sb_rc_search[0],
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received token.',
+        result: null,
+      });
+    }
+  }
+
+  //getListIssuer
+  async getListIssuer(response: Response) {
+    const sb_rc_search = await this.sbrcService.sbrcSearchEL('Issuer', {
+      filters: {},
+    });
+    if (sb_rc_search?.error) {
+      return response.status(501).send({
+        success: false,
+        status: 'sb_rc_search_error',
+        message: 'System Search Error ! Please try again.',
+        result: sb_rc_search?.error.message,
+      });
+    } else if (sb_rc_search.length === 0) {
+      return response.status(404).send({
+        success: false,
+        status: 'sb_rc_search_no_found',
+        message: 'Data Not Found in System.',
+        result: null,
+      });
+    } else {
+      let issuer_detail = [];
+      for (let i = 0; i < sb_rc_search.length; i++) {
+        issuer_detail.push({
+          name: sb_rc_search[i].name,
+          did: sb_rc_search[i].did,
+        });
+      }
+      return response.status(200).send({
+        success: true,
+        status: 'sb_rc_search_found',
+        message: 'Data Found in System.',
+        result: issuer_detail,
+      });
+    }
+  }
+
+  //instructor
+  //registerInstructor
+  async registerInstructor(
+    name: string,
+    dob: string,
+    gender: string,
+    recoveryphone: string,
+    issuer_did: string,
+    school_name: string,
+    school_id: string,
+    username: string,
+    kyc_aadhaar_token: string,
+    response: Response,
+  ) {
+    if (
+      name &&
+      dob &&
+      gender &&
+      recoveryphone &&
+      issuer_did &&
+      school_name &&
+      school_id &&
+      username &&
+      kyc_aadhaar_token
+    ) {
+      // find student
+      let searchSchema = {
+        filters: {
+          name: {
+            eq: name,
+          },
+          dob: {
+            eq: dob,
+          },
+          gender: {
+            eq: gender,
+          },
+        },
+      };
+      const instructorDetails = await this.sbrcService.sbrcSearch(
+        searchSchema,
+        'Instructor',
+      );
+      console.log('Instructor Details', instructorDetails);
+      if (instructorDetails.length == 0) {
+        //register in keycloak and then in sunbird rc
+        //create keycloak and then login
+        const clientToken = await this.keycloakService.getClientToken();
+        console.log('clientToken', clientToken);
+        if (clientToken?.error) {
+          return response.status(401).send({
+            success: false,
+            status: 'keycloak_client_token_error',
+            message: 'System Authentication Failed ! Please Try Again.',
+            result: null,
+          });
+        } else {
+          ///register in keycloak
+          let response_text = await this.keycloakService.registerUserKeycloak(
+            username,
+            '4163416&V&7wve72',
+            clientToken,
+          );
+          console.log('registerUserKeycloak', response_text);
+          //generate did
+          let instructor_did = '';
+          let didRes = await this.credService.generateDid(username + name);
+          if (didRes) {
+            instructor_did = didRes[0].verificationMethod[0].controller;
+            //register and create account in sunbird rc
+            let inviteSchema = {
+              name: name,
+              dob: dob,
+              gender: gender,
+              did: instructor_did,
+              username: username,
+              aadhaar_token: '',
+              kyc_aadhaar_token: kyc_aadhaar_token,
+              recoveryphone: recoveryphone,
+              issuer_did: issuer_did,
+              school_name: school_name,
+              school_id: school_id,
+            };
+            console.log('inviteSchema', inviteSchema);
+            let createInstructor = await this.sbrcService.sbrcInvite(
+              inviteSchema,
+              'Instructor',
+            );
+            console.log('createInstructor', createInstructor);
+            if (createInstructor) {
+              return response.status(200).send({
+                success: true,
+                status: 'sbrc_register_success',
+                message: 'User Account Registered.',
+                result: null,
+              });
+            } else {
+              return response.status(400).send({
+                success: false,
+                status: 'sbrc_invite_error',
+                message: 'Unable to Register Instructor. Try Again.',
+                result: null,
+              });
+            }
+          } else {
+            return response.status(400).send({
+              success: false,
+              status: 'did_generate_fail',
+              message: 'Unable to Generate Instructor DID ! Please Try Again.',
+              result: null,
+            });
+          }
+        }
+      } else if (instructorDetails.length > 0) {
+        if (instructorDetails[0].username != '') {
+          return response.status(400).send({
+            success: false,
+            status: 'sbrc_register_duplicate',
+            message: `You entered account details already linked to an existing Keycloak account, which has a username ${instructorDetails[0].username}. You cannot set a new username for this account detail. Login using the linked username and otp.`,
+            result: null,
+          });
+        } else {
+          //register in keycloak and then update username
+          //register in keycloak
+          //create keycloak and then login
+          const clientToken = await this.keycloakService.getClientToken();
+          if (clientToken?.error) {
+            return response.status(401).send({
+              success: false,
+              status: 'keycloak_client_token_error',
+              message: 'System Authentication Failed ! Please Try Again.',
+              result: null,
+            });
+          } else {
+            ///register in keycloak
+            let response_text = await this.keycloakService.registerUserKeycloak(
+              username,
+              '4163416&V&7wve72',
+              clientToken,
+            );
+            //update username and register in keycloak
+            //update username
+            let updateRes = await this.sbrcService.sbrcUpdate(
+              { username: username, kyc_aadhaar_token: kyc_aadhaar_token },
+              'Instructor',
+              instructorDetails[0].osid,
+            );
+            if (updateRes) {
+              return response.status(200).send({
+                success: true,
+                status: 'sbrc_register_success',
+                message:
+                  'User Account Registered. Login using username and otp.',
+                result: null,
+              });
+            } else {
+              return response.status(200).send({
+                success: false,
+                status: 'sbrc_update_error',
+                message:
+                  'Unable to Update Instructor Username ! Please Try Again.',
+                result: null,
+              });
+            }
+          }
+        }
+      } else {
+        return response.status(200).send({
+          success: false,
+          status: 'sbrc_search_error',
+          message: 'Unable to search Instructor. Try Again.',
+          result: null,
+        });
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getAadhaarTokenUpdate
+  async getAadhaarTokenUpdate(
+    response: Response,
+    aadhaar_id: string,
+    aadhaar_name: string,
+    aadhaar_dob: string,
+    aadhaar_gender: string,
+  ) {
+    if (aadhaar_id && aadhaar_name && aadhaar_dob && aadhaar_gender) {
+      const aadhar_data = await this.aadharService.aadhaarDemographic(
+        aadhaar_id,
+        aadhaar_name,
+        aadhaar_dob,
+        aadhaar_gender,
+      );
+      //console.log(aadhar_data);
+      if (!aadhar_data?.success === true) {
+        return response.status(400).send({
+          success: false,
+          status: 'aadhaar_api_error',
+          message: 'Aadhar API Not Working',
+          result: aadhar_data?.result,
+        });
+      } else {
+        if (aadhar_data?.result?.ret === 'y') {
+          const decodedxml = aadhar_data?.decodedxml;
+          const uuid = await this.aadharService.getUUID(decodedxml);
+          if (uuid === null) {
+            return response.status(400).send({
+              success: false,
+              status: 'aadhaar_api_uuid_error',
+              message: 'Aadhar API UUID Not Found',
+              result: uuid,
+            });
+          } else {
+            //update uuid in user data
+            // find student
+            let searchSchema = {
+              filters: {
+                name: {
+                  eq: aadhaar_name,
+                },
+                dob: {
+                  eq: aadhaar_dob,
+                },
+                gender: {
+                  eq: aadhaar_gender,
+                },
+              },
+            };
+            const instructorDetails = await this.sbrcService.sbrcSearch(
+              searchSchema,
+              'Instructor',
+            );
+            console.log('Instructor Details', instructorDetails);
+            if (instructorDetails.length == 0) {
+              //register in keycloak and then in sunbird rc
+              return response.status(400).send({
+                success: false,
+                status: 'sbrc_instructor_no_found_error',
+                message:
+                  'Instructor Account Not Found. Register and Try Again.',
+                result: null,
+              });
+            } else if (instructorDetails.length > 0) {
+              //update kyc aadhar token
+              //update username
+              let updateRes = await this.sbrcService.sbrcUpdate(
+                { kyc_aadhaar_token: uuid },
+                'Instructor',
+                instructorDetails[0].osid,
+              );
+              if (updateRes) {
+                return response.status(200).send({
+                  success: true,
+                  status: 'aadhaar_api_success',
+                  message: 'Aadhar API Working',
+                  result: null,
+                });
+              } else {
+                return response.status(200).send({
+                  success: false,
+                  status: 'sbrc_update_error',
+                  message:
+                    'Unable to Update Instructor Aadhaar KYC Token ! Please Try Again.',
+                  result: null,
+                });
+              }
+            } else {
+              return response.status(200).send({
+                success: false,
+                status: 'sbrc_search_error',
+                message: 'Unable to search Learner. Try Again.',
+                result: null,
+              });
+            }
+          }
+        } else {
+          return response.status(200).send({
+            success: false,
+            status: 'invalid_aadhaar',
+            message: 'Invalid Aadhaar',
+            result: null,
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //get detail
+  //getDetailInstructor
+  async getDetailInstructor(token: string, response: Response) {
+    if (token) {
+      const instructorUsername = await this.keycloakService.verifyUserToken(
+        token,
+      );
+      if (instructorUsername?.error) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_bad_request',
+          message: 'You do not have access for this request.',
+          result: null,
+        });
+      } else if (!instructorUsername?.preferred_username) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_error',
+          message: 'Your Login Session Expired.',
+          result: null,
+        });
+      } else {
+        const sb_rc_search = await this.sbrcService.sbrcSearchEL('Instructor', {
+          filters: {
+            username: {
+              eq: instructorUsername?.preferred_username,
+            },
+          },
+        });
+        if (sb_rc_search?.error) {
+          return response.status(501).send({
+            success: false,
+            status: 'sb_rc_search_error',
+            message: 'System Search Error ! Please try again.',
+            result: sb_rc_search?.error.message,
+          });
+        } else if (sb_rc_search.length === 0) {
+          return response.status(404).send({
+            success: false,
+            status: 'sb_rc_search_no_found',
+            message: 'Data Not Found in System.',
+            result: null,
+          });
+        } else {
+          return response.status(200).send({
+            success: true,
+            status: 'sb_rc_search_found',
+            message: 'Data Found in System.',
+            result: sb_rc_search[0],
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received token.',
+        result: null,
+      });
+    }
+  }
+
+  //getDetailDigiInstructor
+  async getDetailDigiInstructor(
+    token: string,
+    name: string,
+    dob: string,
+    gender: string,
+    response: Response,
+  ) {
+    if (token && name && dob && gender) {
+      const instructorUsername = await this.keycloakService.verifyUserToken(
+        token,
+      );
+      if (instructorUsername?.error) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_bad_request',
+          message: 'You do not have access for this request.',
+          result: null,
+        });
+      } else if (!instructorUsername?.preferred_username) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_error',
+          message: 'Your Login Session Expired.',
+          result: null,
+        });
+      } else {
+        const sb_rc_search = await this.sbrcService.sbrcSearchEL('Instructor', {
+          filters: {
+            name: {
+              eq: name,
+            },
+            dob: {
+              eq: dob,
+            },
+            gender: {
+              eq: gender,
+            },
+          },
+        });
+        if (sb_rc_search?.error) {
+          return response.status(501).send({
+            success: false,
+            status: 'sb_rc_search_error',
+            message: 'System Search Error ! Please try again.',
+            result: sb_rc_search?.error.message,
+          });
+        } else if (sb_rc_search.length === 0) {
+          return response.status(404).send({
+            success: false,
+            status: 'sb_rc_search_no_found',
+            message: 'Data Not Found in System.',
+            result: null,
+          });
+        } else {
+          return response.status(200).send({
+            success: true,
+            status: 'sb_rc_search_found',
+            message: 'Data Found in System.',
+            result: sb_rc_search[0],
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received token.',
+        result: null,
+      });
+    }
+  }
+
   //getCredentialSchemaCreate
   async getCredentialSchemaCreate(postrequest: any, response: Response) {
     if (postrequest) {
@@ -223,6 +869,83 @@ export class BulkIssuanceService {
             status: 'get_schema_list_no_found',
             message: 'Get Schema List Not Found ! Please Change Tags.',
             result: null,
+          });
+        }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getCredentialSchemaTemplateCreate
+  async getCredentialSchemaTemplateCreate(
+    postrequest: any,
+    response: Response,
+  ) {
+    if (postrequest) {
+      const getschematemplatecreate =
+        await this.credService.schemaTemplateCreate(postrequest);
+      if (getschematemplatecreate?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'get_schema_template_error',
+          message: 'Get Schema Template Create Failed ! Please Try Again.',
+          result: getschematemplatecreate,
+        });
+      } else {
+        return response.status(200).send({
+          success: true,
+          status: 'schema_template_create_success',
+          message: 'Schema Template Create Success',
+          result: getschematemplatecreate,
+        });
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+  //getCredentialSchemaTemplateList
+  async getCredentialSchemaTemplateList(postrequest: any, response: Response) {
+    if (postrequest?.schema_id) {
+      console.log(postrequest.schema_id);
+      const getschematemplatelist = await this.credService.schemaTemplateList(
+        postrequest?.schema_id,
+      );
+      if (getschematemplatelist?.error) {
+        return response.status(400).send({
+          success: false,
+          status: 'get_schema_error',
+          message: 'Get Schema Template List Failed ! Please Try Again.',
+          result: getschematemplatelist,
+        });
+      } else {
+        if (getschematemplatelist.length > 0) {
+          let schematemplatelist = [];
+          for (let i = 0; i < getschematemplatelist.length; i++) {
+            schematemplatelist.push(getschematemplatelist[i]);
+          }
+          return response.status(200).send({
+            success: true,
+            status: 'schema_template_list_success',
+            message: 'Schema Template List Success',
+            result: schematemplatelist,
+          });
+        } else {
+          return response.status(200).send({
+            success: false,
+            status: 'get_schema_template_list_no_found',
+            message: 'Get Schema Template List Not Found !',
+            result: getschematemplatelist,
           });
         }
       }
