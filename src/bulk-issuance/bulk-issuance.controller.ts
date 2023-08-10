@@ -107,7 +107,7 @@ export class BulkIssuanceController {
     @Body('school_name') school_name: string,
     @Body('school_id') school_id: string,
     @Body('username') username: string,
-    @Body('password') password: string,
+    @Body('kyc_aadhaar_token') kyc_aadhaar_token: string,
     @Res() response: Response,
   ) {
     return this.bulkIssuanceService.registerInstructor(
@@ -119,7 +119,7 @@ export class BulkIssuanceController {
       school_name,
       school_id,
       username,
-      password,
+      kyc_aadhaar_token,
       response,
     );
   }

@@ -382,7 +382,7 @@ export class BulkIssuanceService {
     school_name: string,
     school_id: string,
     username: string,
-    password: string,
+    kyc_aadhaar_token: string,
     response: Response,
   ) {
     if (
@@ -394,7 +394,7 @@ export class BulkIssuanceService {
       school_name &&
       school_id &&
       username &&
-      password
+      kyc_aadhaar_token
     ) {
       // find student
       let searchSchema = {
@@ -431,100 +431,57 @@ export class BulkIssuanceService {
           ///register in keycloak
           let response_text = await this.keycloakService.registerUserKeycloak(
             username,
-            password,
+            '4163416&V&7wve72',
             clientToken,
           );
           console.log('registerUserKeycloak', response_text);
-          if (response_text?.error) {
+          //generate did
+          let instructor_did = '';
+          let didRes = await this.credService.generateDid(username + name);
+          if (didRes) {
+            instructor_did = didRes[0].verificationMethod[0].controller;
+            //register and create account in sunbird rc
+            let inviteSchema = {
+              name: name,
+              dob: dob,
+              gender: gender,
+              did: instructor_did,
+              username: username,
+              aadhaar_token: '',
+              kyc_aadhaar_token: kyc_aadhaar_token,
+              recoveryphone: recoveryphone,
+              issuer_did: issuer_did,
+              school_name: school_name,
+              school_id: school_id,
+            };
+            console.log('inviteSchema', inviteSchema);
+            let createInstructor = await this.sbrcService.sbrcInvite(
+              inviteSchema,
+              'Instructor',
+            );
+            console.log('createInstructor', createInstructor);
+            if (createInstructor) {
+              return response.status(200).send({
+                success: true,
+                status: 'sbrc_register_success',
+                message: 'User Account Registered.',
+                result: null,
+              });
+            } else {
+              return response.status(400).send({
+                success: false,
+                status: 'sbrc_invite_error',
+                message: 'Unable to Register Instructor. Try Again.',
+                result: null,
+              });
+            }
+          } else {
             return response.status(400).send({
               success: false,
-              status: 'keycloak_register_duplicate',
-              message:
-                'You entered username Account Already Present in Keycloak.',
+              status: 'did_generate_fail',
+              message: 'Unable to Generate Instructor DID ! Please Try Again.',
               result: null,
             });
-          } else {
-            //generate did
-            let instructor_did = '';
-            let didRes = await this.credService.generateDid(username + name);
-            if (didRes) {
-              instructor_did = didRes[0].verificationMethod[0].controller;
-              //register and create account in sunbird rc
-              let inviteSchema = {
-                name: name,
-                dob: dob,
-                gender: gender,
-                did: instructor_did,
-                username: username,
-                aadhaar_token: '',
-                kyc_aadhaar_token: '',
-                recoveryphone: recoveryphone,
-                issuer_did: issuer_did,
-                school_name: school_name,
-                school_id: school_id,
-              };
-              console.log('inviteSchema', inviteSchema);
-              let createInstructor = await this.sbrcService.sbrcInvite(
-                inviteSchema,
-                'Instructor',
-              );
-              console.log('createInstructor', createInstructor);
-              if (createInstructor) {
-                return response.status(200).send({
-                  success: true,
-                  status: 'sbrc_register_success',
-                  message: 'User Account Registered. Complete Aadhar KYC.',
-                  needkyc: true,
-                  result: null,
-                });
-              } else {
-                //need to add rollback function for keycloak user delete
-                let response_text_keycloak =
-                  await this.keycloakService.deleteUserKeycloak(
-                    username,
-                    clientToken,
-                  );
-                if (response_text_keycloak?.error) {
-                  return response.status(400).send({
-                    success: false,
-                    status: 'sbrc_invite_error_delete_keycloak',
-                    message: 'Unable to Register Instructor. Try Again.',
-                    result: null,
-                  });
-                } else {
-                  return response.status(400).send({
-                    success: false,
-                    status: 'sbrc_invite_error',
-                    message: 'Unable to Register Instructor. Try Again.',
-                    result: null,
-                  });
-                }
-              }
-            } else {
-              //need to add rollback function for keycloak user delete
-              let response_text_keycloak =
-                await this.keycloakService.deleteUserKeycloak(
-                  username,
-                  clientToken,
-                );
-              if (response_text_keycloak?.error) {
-                return response.status(400).send({
-                  success: false,
-                  status: 'did_generate_error_delete_keycloak',
-                  message:
-                    'Unable to Generate Instructor DID ! Please Try Again.',
-                  result: null,
-                });
-              } else {
-                return response.status(400).send({
-                  success: false,
-                  status: 'did_generate_fail',
-                  message:
-                    'Unable to Generate Instructor DID ! Please Try Again.',
-                  result: null,
-                });
-              }
-            }
           }
         }
       } else if (instructorDetails.length > 0) {
@@ -532,7 +489,7 @@ export class BulkIssuanceService {
           return response.status(400).send({
             success: false,
             status: 'sbrc_register_duplicate',
-            message: `You entered account details already linked to an existing Keycloak account, which has a username ${instructorDetails[0].username}. You cannot set a new username for this account detail. Login using the linked username and password.`,
+            message: `You entered account details already linked to an existing Keycloak account, which has a username ${instructorDetails[0].username}. You cannot set a new username for this account detail. Login using the linked username and otp.`,
             result: null,
           });
         } else {
@@ -551,67 +508,32 @@ export class BulkIssuanceService {
             ///register in keycloak
             let response_text = await this.keycloakService.registerUserKeycloak(
               username,
-              password,
+              '4163416&V&7wve72',
               clientToken,
             );
-            if (response_text?.error) {
-              return response.status(400).send({
-                success: false,
-                status: 'keycloak_register_duplicate',
+            //update username and register in keycloak
+            //update username
+            let updateRes = await this.sbrcService.sbrcUpdate(
+              { username: username, kyc_aadhaar_token: kyc_aadhaar_token },
+              'Instructor',
+              instructorDetails[0].osid,
+            );
+            if (updateRes) {
+              return response.status(200).send({
+                success: true,
+                status: 'sbrc_register_success',
                 message:
-                  'You entered username Account Already Present in Keycloak.',
+                  'User Account Registered. Login using username and otp.',
                 result: null,
               });
             } else {
-              //update username and register in keycloak
-              //update username
-              let updateRes = await this.sbrcService.sbrcUpdate(
-                { username: username },
-                'Instructor',
-                instructorDetails[0].osid,
-              );
-              if (updateRes) {
-                if (instructorDetails[0].kyc_aadhaar_token == '') {
-                  return response.status(200).send({
-                    success: true,
-                    status: 'sbrc_register_success',
-                    message: 'User Account Registered. Complete Aadhar KYC.',
-                    needkyc: true,
-                    result: null,
-                  });
-                } else {
-                  return response.status(200).send({
-                    success: true,
-                    status: 'sbrc_register_success',
-                    message:
-                      'User Account Registered. Login using username and password.',
-                    result: null,
-                  });
-                }
-              } else {
-                //need to add rollback function for keycloak user delete
-                let response_text_keycloak =
-                  await this.keycloakService.deleteUserKeycloak(
-                    username,
-                    clientToken,
-                  );
-                if (response_text_keycloak?.error) {
-                  return response.status(400).send({
-                    success: false,
-                    status: 'sbrc_invite_error_delete_keycloak',
-                    message: 'Unable to Register Instructor. Try Again.',
-                    result: null,
-                  });
-                } else {
-                  return response.status(200).send({
-                    success: false,
-                    status: 'sbrc_update_error',
-                    message:
-                      'Unable to Update Instructor Username ! Please Try Again.',
-                    result: null,
-                  });
-                }
-              }
+              return response.status(200).send({
+                success: false,
+                status: 'sbrc_update_error',
+                message:
+                  'Unable to Update Instructor Username ! Please Try Again.',
+                result: null,
+              });
             }
           }
         }
@@ -753,7 +675,9 @@ export class BulkIssuanceService {
   //getDetailInstructor
   async getDetailInstructor(token: string, response: Response) {
     if (token) {
-      const instructorUsername = await this.keycloakService.verifyUserToken(token);
+      const instructorUsername = await this.keycloakService.verifyUserToken(
+        token,
+      );
       if (instructorUsername?.error) {
         return response.status(401).send({
           success: false,
@@ -818,7 +742,9 @@ export class BulkIssuanceService {
     response: Response,
   ) {
     if (token && name && dob && gender) {
-      const instructorUsername = await this.keycloakService.verifyUserToken(token);
+      const instructorUsername = await this.keycloakService.verifyUserToken(
+        token,
+      );
       if (instructorUsername?.error) {
         return response.status(401).send({
           success: false,
@@ -957,9 +883,13 @@ export class BulkIssuanceService {
   }
 
   //getCredentialSchemaTemplateCreate
-  async getCredentialSchemaTemplateCreate(postrequest: any, response: Response) {
+  async getCredentialSchemaTemplateCreate(
+    postrequest: any,
+    response: Response,
+  ) {
     if (postrequest) {
-      const getschematemplatecreate = await this.credService.schemaTemplateCreate(postrequest);
+      const getschematemplatecreate =
+        await this.credService.schemaTemplateCreate(postrequest);
       if (getschematemplatecreate?.error) {
         return response.status(400).send({
           success: false,
@@ -989,7 +919,7 @@ export class BulkIssuanceService {
     if (postrequest?.schema_id) {
       console.log(postrequest.schema_id);
       const getschematemplatelist = await this.credService.schemaTemplateList(
-        postrequest?.schema_id ,
+        postrequest?.schema_id,
       );
       if (getschematemplatelist?.error) {
         return response.status(400).send({
