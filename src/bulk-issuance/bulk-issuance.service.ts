@@ -379,10 +379,8 @@ export class BulkIssuanceService {
     gender: string,
     recoveryphone: string,
     issuer_did: string,
-    school_name: string,
-    school_id: string,
     username: string,
-    kyc_aadhaar_token: string,
+    email: string,
     response: Response,
   ) {
     if (
@@ -391,10 +389,8 @@ export class BulkIssuanceService {
       gender &&
       recoveryphone &&
       issuer_did &&
-      school_name &&
-      school_id &&
       username &&
-      kyc_aadhaar_token
+      email
     ) {
       // find student
       let searchSchema = {
@@ -448,11 +444,12 @@ export class BulkIssuanceService {
               did: instructor_did,
               username: username,
               aadhaar_token: '',
-              kyc_aadhaar_token: kyc_aadhaar_token,
+              kyc_aadhaar_token: '',
               recoveryphone: recoveryphone,
               issuer_did: issuer_did,
-              school_name: school_name,
-              school_id: school_id,
+              school_name: '',
+              school_id: '',
+              email: email,
             };
             console.log('inviteSchema', inviteSchema);
             let createInstructor = await this.sbrcService.sbrcInvite(
@@ -489,7 +486,7 @@ export class BulkIssuanceService {
           return response.status(400).send({
             success: false,
             status: 'sbrc_register_duplicate',
-            message: `You entered account details already linked to an existing Keycloak account, which has a username ${instructorDetails[0].username}. You cannot set a new username for this account detail. Login using the linked username and otp.`,
+            message: `You entered account details already linked to an existing Keycloak account, which has a mobile number ${instructorDetails[0].username}. You cannot set a new mobile number for this account detail. Login using the linked mobile number and otp.`,
             result: null,
           });
         } else {
@@ -514,7 +511,7 @@ export class BulkIssuanceService {
             //update username and register in keycloak
             //update username
             let updateRes = await this.sbrcService.sbrcUpdate(
-              { username: username, kyc_aadhaar_token: kyc_aadhaar_token },
+              { username: username },
               'Instructor',
               instructorDetails[0].osid,
             );
@@ -523,7 +520,7 @@ export class BulkIssuanceService {
                 success: true,
                 status: 'sbrc_register_success',
                 message:
-                  'User Account Registered. Login using username and otp.',
+                  'User Account Registered. Login using mobile number and otp.',
                 result: null,
               });
             } else {
@@ -647,7 +644,7 @@ export class BulkIssuanceService {
               return response.status(200).send({
                 success: false,
                 status: 'sbrc_search_error',
-                message: 'Unable to search Learner. Try Again.',
+                message: 'Unable to search Instructor. Try Again.',
                 result: null,
               });
             }
@@ -660,6 +657,86 @@ export class BulkIssuanceService {
             result: null,
           });
         }
+      }
+    } else {
+      return response.status(400).send({
+        success: false,
+        status: 'invalid_request',
+        message: 'Invalid Request. Not received All Parameters.',
+        result: null,
+      });
+    }
+  }
+
+  //getUDISEUpdate
+  async getUDISEUpdate(
+    response: Response,
+    school_name: string,
+    school_id: string,
+    name: string,
+    dob: string,
+    gender: string,
+  ) {
+    if (school_name && school_id && name && dob && gender) {
+      //update uuid in user data
+      // find student
+      let searchSchema = {
+        filters: {
+          name: {
+            eq: name,
+          },
+          dob: {
+            eq: dob,
+          },
+          gender: {
+            eq: gender,
+          },
+        },
+      };
+      const instructorDetails = await this.sbrcService.sbrcSearch(
+        searchSchema,
+        'Instructor',
+      );
+      console.log('Instructor Details', instructorDetails);
+      if (instructorDetails.length == 0) {
+        //register in keycloak and then in sunbird rc
+        return response.status(400).send({
+          success: false,
+          status: 'sbrc_instructor_no_found_error',
+          message: 'Instructor Account Not Found. Register and Try Again.',
+          result: null,
+        });
+      } else if (instructorDetails.length > 0) {
+        //update kyc aadhar token
+        //update username
+        let updateRes = await this.sbrcService.sbrcUpdate(
+          { school_name: school_name, school_id: school_id },
+          'Instructor',
+          instructorDetails[0].osid,
+        );
+        if (updateRes) {
+          return response.status(200).send({
+            success: true,
+            status: 'udise_api_success',
+            message: 'UDISE API Working',
+            result: null,
+          });
+        } else {
+          return response.status(200).send({
+            success: false,
+            status: 'sbrc_update_error',
+            message:
+              'Unable to Update Instructor UDISE Detail ! Please Try Again.',
+            result: null,
+          });
+        }
+      } else {
+        return response.status(200).send({
+          success: false,
+          status: 'sbrc_search_error',
+          message: 'Unable to search Instructor. Try Again.',
+          result: null,
+        });
       }
     } else {
       return response.status(400).send({
