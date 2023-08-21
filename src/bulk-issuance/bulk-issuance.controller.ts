@@ -104,10 +104,8 @@ export class BulkIssuanceController {
     @Body('gender') gender: string,
     @Body('recoveryphone') recoveryphone: string,
     @Body('issuer_did') issuer_did: string,
-    @Body('school_name') school_name: string,
-    @Body('school_id') school_id: string,
     @Body('username') username: string,
-    @Body('kyc_aadhaar_token') kyc_aadhaar_token: string,
+    @Body('email') email: string,
     @Res() response: Response,
   ) {
     return this.bulkIssuanceService.registerInstructor(
@@ -116,10 +114,8 @@ export class BulkIssuanceController {
       gender,
       recoveryphone,
       issuer_did,
-      school_name,
-      school_id,
       username,
-      kyc_aadhaar_token,
+      email,
       response,
     );
   }
@@ -138,6 +134,25 @@ export class BulkIssuanceController {
       aadhaar_name,
       aadhaar_dob,
       aadhaar_gender,
+    );
+  }
+  //udise
+  @Post('/instructor/udise')
+  async getUDISEUpdate(
+    @Res() response: Response,
+    @Body('school_name') school_name: string,
+    @Body('school_id') school_id: string,
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+  ) {
+    return this.bulkIssuanceService.getUDISEUpdate(
+      response,
+      school_name,
+      school_id,
+      name,
+      dob,
+      gender,
     );
   }
   //get details
