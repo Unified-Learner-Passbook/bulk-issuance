@@ -122,37 +122,31 @@ export class BulkIssuanceController {
   //aadhaar
   @Post('/instructor/aadhaar')
   async getAadhaarToken(
+    @Headers('Authorization') auth: string,
     @Res() response: Response,
     @Body('aadhaar_id') aadhaar_id: string,
-    @Body('aadhaar_name') aadhaar_name: string,
-    @Body('aadhaar_dob') aadhaar_dob: string,
-    @Body('aadhaar_gender') aadhaar_gender: string,
   ) {
+    const jwt = auth.replace('Bearer ', '');
     return this.bulkIssuanceService.getAadhaarTokenUpdate(
+      jwt,
       response,
       aadhaar_id,
-      aadhaar_name,
-      aadhaar_dob,
-      aadhaar_gender,
     );
   }
   //udise
   @Post('/instructor/udise')
   async getUDISEUpdate(
+    @Headers('Authorization') auth: string,
     @Res() response: Response,
     @Body('school_name') school_name: string,
     @Body('school_id') school_id: string,
-    @Body('name') name: string,
-    @Body('dob') dob: string,
-    @Body('gender') gender: string,
   ) {
+    const jwt = auth.replace('Bearer ', '');
     return this.bulkIssuanceService.getUDISEUpdate(
+      jwt,
       response,
       school_name,
       school_id,
-      name,
-      dob,
-      gender,
     );
   }
   //get details

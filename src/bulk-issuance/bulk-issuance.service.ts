@@ -554,108 +554,151 @@ export class BulkIssuanceService {
 
   //getAadhaarTokenUpdate
   async getAadhaarTokenUpdate(
+    token: string,
     response: Response,
     aadhaar_id: string,
-    aadhaar_name: string,
-    aadhaar_dob: string,
-    aadhaar_gender: string,
   ) {
-    if (aadhaar_id && aadhaar_name && aadhaar_dob && aadhaar_gender) {
-      const aadhar_data = await this.aadharService.aadhaarDemographic(
-        aadhaar_id,
-        aadhaar_name,
-        aadhaar_dob,
-        aadhaar_gender,
+    if (token && aadhaar_id) {
+      const instructorUsername = await this.keycloakService.verifyUserToken(
+        token,
       );
-      //console.log(aadhar_data);
-      if (!aadhar_data?.success === true) {
-        return response.status(400).send({
+      if (instructorUsername?.error) {
+        return response.status(401).send({
           success: false,
-          status: 'aadhaar_api_error',
-          message: 'Aadhar API Not Working',
-          result: aadhar_data?.result,
+          status: 'keycloak_token_bad_request',
+          message: 'You do not have access for this request.',
+          result: null,
+        });
+      } else if (!instructorUsername?.preferred_username) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_error',
+          message: 'Your Login Session Expired.',
+          result: null,
         });
       } else {
-        if (aadhar_data?.result?.ret === 'y') {
-          const decodedxml = aadhar_data?.decodedxml;
-          const uuid = await this.aadharService.getUUID(decodedxml);
-          if (uuid === null) {
+        const sb_rc_search = await this.sbrcService.sbrcSearchEL('Instructor', {
+          filters: {
+            username: {
+              eq: instructorUsername?.preferred_username,
+            },
+          },
+        });
+        if (sb_rc_search?.error) {
+          return response.status(501).send({
+            success: false,
+            status: 'sb_rc_search_error',
+            message: 'System Search Error ! Please try again.',
+            result: sb_rc_search?.error.message,
+          });
+        } else if (sb_rc_search.length === 0) {
+          return response.status(404).send({
+            success: false,
+            status: 'sb_rc_search_no_found',
+            message: 'Data Not Found in System.',
+            result: null,
+          });
+        } else {
+          let aadhaar_name = sb_rc_search[0].name;
+          let aadhaar_dob = sb_rc_search[0].dob;
+          let aadhaar_gender = sb_rc_search[0].gender;
+          const aadhar_data = await this.aadharService.aadhaarDemographic(
+            aadhaar_id,
+            aadhaar_name,
+            aadhaar_dob,
+            aadhaar_gender,
+          );
+          //console.log(aadhar_data);
+          if (!aadhar_data?.success === true) {
             return response.status(400).send({
               success: false,
-              status: 'aadhaar_api_uuid_error',
-              message: 'Aadhar API UUID Not Found',
-              result: uuid,
+              status: 'aadhaar_api_error',
+              message: 'Aadhar API Not Working',
+              result: aadhar_data?.result,
             });
           } else {
-            //update uuid in user data
-            // find student
-            let searchSchema = {
-              filters: {
-                name: {
-                  eq: aadhaar_name,
-                },
-                dob: {
-                  eq: aadhaar_dob,
-                },
-                gender: {
-                  eq: aadhaar_gender,
-                },
-              },
-            };
-            const instructorDetails = await this.sbrcService.sbrcSearch(
-              searchSchema,
-              'Instructor',
-            );
-            console.log('Instructor Details', instructorDetails);
-            if (instructorDetails.length == 0) {
-              //register in keycloak and then in sunbird rc
-              return response.status(400).send({
-                success: false,
-                status: 'sbrc_instructor_no_found_error',
-                message:
-                  'Instructor Account Not Found. Register and Try Again.',
-                result: null,
-              });
-            } else if (instructorDetails.length > 0) {
-              //update kyc aadhar token
-              //update username
-              let updateRes = await this.sbrcService.sbrcUpdate(
-                { kyc_aadhaar_token: uuid },
-                'Instructor',
-                instructorDetails[0].osid,
-              );
-              if (updateRes) {
-                return response.status(200).send({
-                  success: true,
-                  status: 'aadhaar_api_success',
-                  message: 'Aadhar API Working',
-                  result: null,
+            if (aadhar_data?.result?.ret === 'y') {
+              const decodedxml = aadhar_data?.decodedxml;
+              const uuid = await this.aadharService.getUUID(decodedxml);
+              if (uuid === null) {
+                return response.status(400).send({
+                  success: false,
+                  status: 'aadhaar_api_uuid_error',
+                  message: 'Aadhar API UUID Not Found',
+                  result: uuid,
                 });
               } else {
-                return response.status(200).send({
-                  success: false,
-                  status: 'sbrc_update_error',
-                  message:
-                    'Unable to Update Instructor Aadhaar KYC Token ! Please Try Again.',
-                  result: null,
-                });
+                //update uuid in user data
+                // find student
+                let searchSchema = {
+                  filters: {
+                    name: {
+                      eq: aadhaar_name,
+                    },
+                    dob: {
+                      eq: aadhaar_dob,
+                    },
+                    gender: {
+                      eq: aadhaar_gender,
+                    },
+                  },
+                };
+                const instructorDetails = await this.sbrcService.sbrcSearch(
+                  searchSchema,
+                  'Instructor',
+                );
+                console.log('Instructor Details', instructorDetails);
+                if (instructorDetails.length == 0) {
+                  //register in keycloak and then in sunbird rc
+                  return response.status(400).send({
+                    success: false,
+                    status: 'sbrc_instructor_no_found_error',
+                    message:
+                      'Instructor Account Not Found. Register and Try Again.',
+                    result: null,
+                  });
+                } else if (instructorDetails.length > 0) {
+                  //update kyc aadhar token
+                  //update username
+                  let updateRes = await this.sbrcService.sbrcUpdate(
+                    { kyc_aadhaar_token: uuid },
+                    'Instructor',
+                    instructorDetails[0].osid,
+                  );
+                  if (updateRes) {
+                    return response.status(200).send({
+                      success: true,
+                      status: 'aadhaar_api_success',
+                      message: 'Aadhar API Working',
+                      result: null,
+                    });
+                  } else {
+                    return response.status(200).send({
+                      success: false,
+                      status: 'sbrc_update_error',
+                      message:
+                        'Unable to Update Instructor Aadhaar KYC Token ! Please Try Again.',
+                      result: null,
+                    });
+                  }
+                } else {
+                  return response.status(200).send({
+                    success: false,
+                    status: 'sbrc_search_error',
+                    message: 'Unable to search Instructor. Try Again.',
+                    result: null,
+                  });
+                }
               }
             } else {
               return response.status(200).send({
                 success: false,
-                status: 'sbrc_search_error',
-                message: 'Unable to search Instructor. Try Again.',
+                status: 'invalid_aadhaar',
+                message: 'Invalid Aadhaar',
                 result: null,
               });
             }
           }
-        } else {
-          return response.status(200).send({
-            success: false,
-            status: 'invalid_aadhaar',
-            message: 'Invalid Aadhaar',
-            result: null,
-          });
         }
       }
     } else {
@@ -670,73 +713,116 @@ export class BulkIssuanceService {
 
   //getUDISEUpdate
   async getUDISEUpdate(
+    token: string,
     response: Response,
     school_name: string,
     school_id: string,
-    name: string,
-    dob: string,
-    gender: string,
   ) {
-    if (school_name && school_id && name && dob && gender) {
-      //update uuid in user data
-      // find student
-      let searchSchema = {
-        filters: {
-          name: {
-            eq: name,
-          },
-          dob: {
-            eq: dob,
-          },
-          gender: {
-            eq: gender,
-          },
-        },
-      };
-      const instructorDetails = await this.sbrcService.sbrcSearch(
-        searchSchema,
-        'Instructor',
+    if (token && school_name && school_id) {
+      const instructorUsername = await this.keycloakService.verifyUserToken(
+        token,
       );
-      console.log('Instructor Details', instructorDetails);
-      if (instructorDetails.length == 0) {
-        //register in keycloak and then in sunbird rc
-        return response.status(400).send({
+      if (instructorUsername?.error) {
+        return response.status(401).send({
           success: false,
-          status: 'sbrc_instructor_no_found_error',
-          message: 'Instructor Account Not Found. Register and Try Again.',
+          status: 'keycloak_token_bad_request',
+          message: 'You do not have access for this request.',
           result: null,
         });
-      } else if (instructorDetails.length > 0) {
-        //update kyc aadhar token
-        //update username
-        let updateRes = await this.sbrcService.sbrcUpdate(
-          { school_name: school_name, school_id: school_id },
-          'Instructor',
-          instructorDetails[0].osid,
-        );
-        if (updateRes) {
-          return response.status(200).send({
-            success: true,
-            status: 'udise_api_success',
-            message: 'UDISE API Working',
+      } else if (!instructorUsername?.preferred_username) {
+        return response.status(401).send({
+          success: false,
+          status: 'keycloak_token_error',
+          message: 'Your Login Session Expired.',
+          result: null,
+        });
+      } else {
+        const sb_rc_search = await this.sbrcService.sbrcSearchEL('Instructor', {
+          filters: {
+            username: {
+              eq: instructorUsername?.preferred_username,
+            },
+          },
+        });
+        if (sb_rc_search?.error) {
+          return response.status(501).send({
+            success: false,
+            status: 'sb_rc_search_error',
+            message: 'System Search Error ! Please try again.',
+            result: sb_rc_search?.error.message,
+          });
+        } else if (sb_rc_search.length === 0) {
+          return response.status(404).send({
+            success: false,
+            status: 'sb_rc_search_no_found',
+            message: 'Data Not Found in System.',
             result: null,
           });
         } else {
-          return response.status(200).send({
-            success: false,
-            status: 'sbrc_update_error',
-            message:
-              'Unable to Update Instructor UDISE Detail ! Please Try Again.',
-            result: null,
-          });
+          let name = sb_rc_search[0].name;
+          let dob = sb_rc_search[0].dob;
+          let gender = sb_rc_search[0].gender;
+          //update udise in user data
+          // find student
+          let searchSchema = {
+            filters: {
+              name: {
+                eq: name,
+              },
+              dob: {
+                eq: dob,
+              },
+              gender: {
+                eq: gender,
+              },
+            },
+          };
+          const instructorDetails = await this.sbrcService.sbrcSearch(
+            searchSchema,
+            'Instructor',
+          );
+          console.log('Instructor Details', instructorDetails);
+          if (instructorDetails.length == 0) {
+            //register in keycloak and then in sunbird rc
+            return response.status(400).send({
+              success: false,
+              status: 'sbrc_instructor_no_found_error',
+              message: 'Instructor Account Not Found. Register and Try Again.',
+              result: null,
+            });
+          } else if (instructorDetails.length > 0) {
+            //update kyc aadhar token
+            //update username
+            let updateRes = await this.sbrcService.sbrcUpdate(
+              { school_name: school_name, school_id: school_id },
+              'Instructor',
+              instructorDetails[0].osid,
+            );
+            if (updateRes) {
+              return response.status(200).send({
+                success: true,
+                status: 'udise_api_success',
+                message: 'UDISE API Working',
+                result: null,
+              });
+            } else {
+              return response.status(200).send({
+                success: false,
+                status: 'sbrc_update_error',
+                message:
+                  'Unable to Update Instructor UDISE Detail ! Please Try Again.',
+                result: null,
+              });
+            }
+          } else {
+            return response.status(200).send({
+              success: false,
+              status: 'sbrc_search_error',
+              message: 'Unable to search Instructor. Try Again.',
+              result: null,
+            });
+          }
         }
-      } else {
-        return response.status(200).send({
-          success: false,
-          status: 'sbrc_search_error',
-          message: 'Unable to search Instructor. Try Again.',
-          result: null,
-        });
       }
     } else {
       return response.status(400).send({
