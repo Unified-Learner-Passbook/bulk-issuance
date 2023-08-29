@@ -13,13 +13,13 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { BulkIssuanceService } from './bulk-issuance.service';
 import { Response } from 'express';
-import { UsersService } from 'src/services/users/users.service';
+//import { UsersService } from 'src/services/users/users.service';
 
 @Controller('/bulk/v1/')
 export class BulkIssuanceController {
   constructor(
     private readonly bulkIssuanceService: BulkIssuanceService,
-    private usersService: UsersService,
+    //private usersService: UsersService,
   ) {}
 
   @Get('/test')
@@ -33,7 +33,7 @@ export class BulkIssuanceController {
     const LEARNER_SCHEMA_FIELD = process.env.LEARNER_SCHEMA_FIELD;
     const result = {
       success: true,
-      message: 'Bulk Issuance API Working 29 August 23 v3',
+      message: 'Bulk Issuance API Working 29 August 23 v4',
       TESTVAR: TESTVAR,
       CRED_URL: CRED_URL,
       DID_URL: DID_URL,
