@@ -769,9 +769,9 @@ export class BulkIssuanceService {
           instructorUsername?.attributes?.name
         ) {
           //login with digilocker
-          aadhaar_name = instructorUsername?.attributes?.name;
-          aadhaar_dob = instructorUsername?.attributes?.dob;
-          aadhaar_gender = instructorUsername?.attributes?.gender;
+          aadhaar_name = instructorUsername?.attributes?.name[0];
+          aadhaar_dob = instructorUsername?.attributes?.dob[0];
+          aadhaar_gender = instructorUsername?.attributes?.gender[0];
         } else {
           //login with mobile and otp
           const sb_rc_search = await this.sbrcService.sbrcSearchEL(
@@ -947,9 +947,9 @@ export class BulkIssuanceService {
           instructorUsername?.attributes?.name
         ) {
           //login with digilocker
-          name = instructorUsername?.attributes?.name;
-          dob = instructorUsername?.attributes?.dob;
-          gender = instructorUsername?.attributes?.gender;
+          name = instructorUsername?.attributes?.name[0];
+          dob = instructorUsername?.attributes?.dob[0];
+          gender = instructorUsername?.attributes?.gender[0];
         } else {
           //login with mobile and otp
           const sb_rc_search = await this.sbrcService.sbrcSearchEL(
@@ -1561,9 +1561,9 @@ export class BulkIssuanceService {
           learnerUsername?.attributes?.name
         ) {
           //login with digilocker
-          aadhaar_name = learnerUsername?.attributes?.name;
-          aadhaar_dob = learnerUsername?.attributes?.dob;
-          aadhaar_gender = learnerUsername?.attributes?.gender;
+          aadhaar_name = learnerUsername?.attributes?.name[0];
+          aadhaar_dob = learnerUsername?.attributes?.dob[0];
+          aadhaar_gender = learnerUsername?.attributes?.gender[0];
         } else {
           //login with mobile and otp
           const sb_rc_search = await this.sbrcService.sbrcSearchEL('Learner', {
