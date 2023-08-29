@@ -6,7 +6,7 @@ import { SbrcModule } from 'src/services/sbrc/sbrc.module';
 import { TelemetryModule } from 'src/services/telemetry/telemetry.module';
 import { AadharModule } from 'src/services/aadhar/aadhar.module';
 import { KeycloakModule } from 'src/services/keycloak/keycloak.module';
-import { UsersModule } from 'src/services/users/users.module';
+//import { UsersModule } from 'src/services/users/users.module';
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { UsersModule } from 'src/services/users/users.module';
     TelemetryModule,
     AadharModule,
     KeycloakModule,
-    UsersModule,
+    //UsersModule,
   ],
   controllers: [BulkIssuanceController],
   providers: [BulkIssuanceService],

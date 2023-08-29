@@ -8,7 +8,7 @@ import { TelemetryService } from 'src/services/telemetry/telemetry.service';
 import { AadharService } from 'src/services/aadhar/aadhar.service';
 import { KeycloakService } from 'src/services/keycloak/keycloak.service';
 import jwt_decode from 'jwt-decode';
-import { UsersService } from 'src/services/users/users.service';
+//import { UsersService } from 'src/services/users/users.service';
 const { Readable } = require('stream');
 
 @Injectable()
@@ -20,8 +20,8 @@ export class BulkIssuanceService {
     private aadharService: AadharService,
     private keycloakService: KeycloakService,
     private readonly httpService: HttpService,
-    private usersService: UsersService,
-  ) {}
+  ) //private usersService: UsersService,
+  {}
 
   fs = require('fs');
   parse = require('csv-parse');
@@ -3623,7 +3623,7 @@ export class BulkIssuanceService {
     }
   }
   async credentialSubjectData(type) {
-    console.log('type', type);
+    /*console.log('type', type);
     var users;
     var credSubject = [];
     if (type === 'proofOfAssessment') {
@@ -3692,6 +3692,6 @@ export class BulkIssuanceService {
       }
     }
     console.log('credSubject', credSubject);
-    return credSubject;
+    return credSubject;*/
   }
 }
