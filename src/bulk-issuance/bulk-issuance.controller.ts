@@ -19,8 +19,8 @@ import { Response } from 'express';
 export class BulkIssuanceController {
   constructor(
     private readonly bulkIssuanceService: BulkIssuanceService,
-    //private usersService: UsersService,
-  ) {}
+  ) //private usersService: UsersService,
+  {}
 
   @Get('/test')
   getUser(@Res() response: Response) {
@@ -356,6 +356,17 @@ export class BulkIssuanceController {
     @Res() response: Response,
   ) {
     return this.bulkIssuanceService.getCredentialIssue(postrequest, response);
+  }
+
+  //portal counter
+  @Post('/portal/count')
+  async searchCount(
+    @Headers('Authorization') auth: string,
+    @Body('countFields') countFields: any,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.searchCount(jwt, countFields, response);
   }
 
   //deprecated
