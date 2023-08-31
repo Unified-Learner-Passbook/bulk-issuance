@@ -13,13 +13,13 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { BulkIssuanceService } from './bulk-issuance.service';
 import { Response } from 'express';
-import { UsersService } from 'src/services/users/users.service';
+//import { UsersService } from 'src/services/users/users.service';
 
 @Controller('/bulk/v1/')
 export class BulkIssuanceController {
   constructor(
     private readonly bulkIssuanceService: BulkIssuanceService,
-    private usersService: UsersService,
+    //private usersService: UsersService,
   ) {}
 
   @Get('/test')
@@ -33,7 +33,7 @@ export class BulkIssuanceController {
     const LEARNER_SCHEMA_FIELD = process.env.LEARNER_SCHEMA_FIELD;
     const result = {
       success: true,
-      message: 'Bulk Issuance API Working 23 July 23',
+      message: 'Bulk Issuance API Working 29 August 23 v4',
       TESTVAR: TESTVAR,
       CRED_URL: CRED_URL,
       DID_URL: DID_URL,
@@ -45,6 +45,8 @@ export class BulkIssuanceController {
     response.status(200).send(result);
   }
 
+  //issuer
+  //clienttoken
   @Post('/clienttoken')
   async getClientToken(
     @Body('password') password: string,
@@ -52,7 +54,7 @@ export class BulkIssuanceController {
   ) {
     return this.bulkIssuanceService.getClientToken(password, response);
   }
-
+  //getdid
   @Post('/getdid')
   async getDID(
     @Body('uniquetext') uniquetext: string,
@@ -60,7 +62,7 @@ export class BulkIssuanceController {
   ) {
     return this.bulkIssuanceService.getDID(uniquetext, response);
   }
-
+  //issuerregister
   @Post('/issuerregister')
   async getIssuerRegister(
     @Headers('Authorization') auth: string,
@@ -80,7 +82,7 @@ export class BulkIssuanceController {
       response,
     );
   }
-
+  //issuerdetail
   @Get('/issuerdetail')
   async getDetailIssuer(
     @Headers('Authorization') auth: string,
@@ -89,13 +91,43 @@ export class BulkIssuanceController {
     const jwt = auth.replace('Bearer ', '');
     return this.bulkIssuanceService.getDetailIssuer(jwt, response);
   }
-
   @Get('/issuerlist')
   async getListIssuer(@Res() response: Response) {
     return this.bulkIssuanceService.getListIssuer(response);
   }
 
   //instructor
+  //q1
+  //register
+  @Post('/instructor/q1/register')
+  async registerQ1Instructor(
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Body('recoveryphone') recoveryphone: string,
+    @Body('issuer_did') issuer_did: string,
+    @Body('username') username: string,
+    @Body('email') email: string,
+    @Body('kyc_aadhaar_token') kyc_aadhaar_token: string,
+    @Body('school_name') school_name: string,
+    @Body('school_id') school_id: string,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.registerQ1Instructor(
+      name,
+      dob,
+      gender,
+      recoveryphone,
+      issuer_did,
+      username,
+      email,
+      kyc_aadhaar_token,
+      school_name,
+      school_id,
+      response,
+    );
+  }
+  //q2
   //register
   @Post('/instructor/register')
   async registerInstructor(
@@ -104,10 +136,8 @@ export class BulkIssuanceController {
     @Body('gender') gender: string,
     @Body('recoveryphone') recoveryphone: string,
     @Body('issuer_did') issuer_did: string,
-    @Body('school_name') school_name: string,
-    @Body('school_id') school_id: string,
     @Body('username') username: string,
-    @Body('kyc_aadhaar_token') kyc_aadhaar_token: string,
+    @Body('email') email: string,
     @Res() response: Response,
   ) {
     return this.bulkIssuanceService.registerInstructor(
@@ -116,28 +146,39 @@ export class BulkIssuanceController {
       gender,
       recoveryphone,
       issuer_did,
-      school_name,
-      school_id,
       username,
-      kyc_aadhaar_token,
+      email,
       response,
     );
   }
   //aadhaar
   @Post('/instructor/aadhaar')
   async getAadhaarToken(
+    @Headers('Authorization') auth: string,
     @Res() response: Response,
     @Body('aadhaar_id') aadhaar_id: string,
-    @Body('aadhaar_name') aadhaar_name: string,
-    @Body('aadhaar_dob') aadhaar_dob: string,
-    @Body('aadhaar_gender') aadhaar_gender: string,
   ) {
+    const jwt = auth.replace('Bearer ', '');
     return this.bulkIssuanceService.getAadhaarTokenUpdate(
+      jwt,
       response,
       aadhaar_id,
-      aadhaar_name,
-      aadhaar_dob,
-      aadhaar_gender,
+    );
+  }
+  //udise
+  @Post('/instructor/udise')
+  async getUDISEUpdate(
+    @Headers('Authorization') auth: string,
+    @Res() response: Response,
+    @Body('school_name') school_name: string,
+    @Body('school_id') school_id: string,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getUDISEUpdate(
+      jwt,
+      response,
+      school_name,
+      school_id,
     );
   }
   //get details
@@ -149,6 +190,7 @@ export class BulkIssuanceController {
     const jwt = auth.replace('Bearer ', '');
     return this.bulkIssuanceService.getDetailInstructor(jwt, response);
   }
+  //get digi details
   @Post('/instructor/digi/getdetail')
   async getDetailDigiInstructor(
     @Headers('Authorization') auth: string,
@@ -167,6 +209,92 @@ export class BulkIssuanceController {
     );
   }
 
+  //learner
+  //q1
+  //register
+  @Post('/learner/q1/register')
+  async registerQ1Learner(
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Body('recoveryphone') recoveryphone: string,
+    @Body('username') username: string,
+    @Body('kyc_aadhaar_token') kyc_aadhaar_token: string,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.registerQ1Learner(
+      name,
+      dob,
+      gender,
+      recoveryphone,
+      username,
+      kyc_aadhaar_token,
+      response,
+    );
+  }
+  //q2
+  //register
+  @Post('/learner/register')
+  async registerLearner(
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Body('recoveryphone') recoveryphone: string,
+    @Body('username') username: string,
+    @Res() response: Response,
+  ) {
+    return this.bulkIssuanceService.registerLearner(
+      name,
+      dob,
+      gender,
+      recoveryphone,
+      username,
+      response,
+    );
+  }
+  //aadhaar
+  @Post('/learner/aadhaar')
+  async getAadhaarTokenLearner(
+    @Headers('Authorization') auth: string,
+    @Res() response: Response,
+    @Body('aadhaar_id') aadhaar_id: string,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getAadhaarTokenLearner(
+      jwt,
+      response,
+      aadhaar_id,
+    );
+  }
+  //get details
+  @Get('/learner/getdetail')
+  async getDetailLearner(
+    @Headers('Authorization') auth: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailLearner(jwt, response);
+  }
+  //get digi details
+  @Post('/learner/digi/getdetail')
+  async getDetailDigiLearner(
+    @Headers('Authorization') auth: string,
+    @Body('name') name: string,
+    @Body('dob') dob: string,
+    @Body('gender') gender: string,
+    @Res() response: Response,
+  ) {
+    const jwt = auth.replace('Bearer ', '');
+    return this.bulkIssuanceService.getDetailDigiLearner(
+      jwt,
+      name,
+      dob,
+      gender,
+      response,
+    );
+  }
+
+  //schema
   //get credentials/schema/required
   @Post('/credential/schema/create')
   async getCredentialSchemaCreate(
@@ -178,7 +306,7 @@ export class BulkIssuanceController {
       response,
     );
   }
-
+  //get schema list
   @Post('/credential/schema/list')
   async getCredentialSchemaList(
     @Body() postrequest: any,
@@ -189,7 +317,6 @@ export class BulkIssuanceController {
       response,
     );
   }
-
   //schema template create
   @Post('/credential/schema/template/create')
   async getCredentialSchemaTemplateCreate(
@@ -201,7 +328,7 @@ export class BulkIssuanceController {
       response,
     );
   }
-
+  //schema template list
   @Post('/credential/schema/template/list')
   async getCredentialSchemaTemplateList(
     @Body() postrequest: any,
@@ -212,7 +339,7 @@ export class BulkIssuanceController {
       response,
     );
   }
-
+  //get scheama field
   @Post('/credential/schema/fields')
   async getSchemaFields(
     @Body('schema_id') schema_id: string,
@@ -221,6 +348,8 @@ export class BulkIssuanceController {
     return this.bulkIssuanceService.getSchemaFields(schema_id, response);
   }
 
+  //credentials
+  //get credentials issue
   @Post('/credential/issue')
   async getCredentialIssue(
     @Body() postrequest: any,
@@ -229,12 +358,11 @@ export class BulkIssuanceController {
     return this.bulkIssuanceService.getCredentialIssue(postrequest, response);
   }
 
+  //deprecated
   @Post('/user/create')
   async getUserCreate(@Body() postrequest: any, @Res() response: Response) {
     return this.bulkIssuanceService.getUserCreate(postrequest, response);
   }
-
-  //deprecated
   @Post('/issuertoken')
   async getIssuerToken(
     @Body('username') username: string,
@@ -265,7 +393,6 @@ export class BulkIssuanceController {
       response,
     );
   }
-
   @Post('/upload/:type')
   bulkUpload(
     @Param('type') type: string,

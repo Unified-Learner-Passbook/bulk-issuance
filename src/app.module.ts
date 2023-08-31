@@ -23,18 +23,18 @@ import { UsersModule } from './services/users/users.module';
     TelemetryModule,
     AadharModule,
     KeycloakModule,
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: '64.227.129.71',
-      port: 5432,
-      username: 'postgres',
-      password: '4E3k%nC*AG',
-      database: 'middleware_db',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true,
-      logging: true
-    }),
-    UsersModule,
+    // TypeOrmModule.forRoot({
+    //   type: 'postgres',
+    //   host: '64.227.129.71',
+    //   port: 5432,
+    //   username: 'postgres',
+    //   password: '4E3k%nC*AG',
+    //   database: 'middleware_db',
+    //   entities: [__dirname + '/**/*.entity{.ts,.js}'],
+    //   synchronize: true,
+    //   logging: true
+    // }),
+    //UsersModule,
   ],
   providers: [],
 })
