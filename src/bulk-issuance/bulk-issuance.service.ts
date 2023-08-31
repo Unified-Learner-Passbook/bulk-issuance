@@ -2539,13 +2539,16 @@ export class BulkIssuanceService {
             let field = countFields[i];
             let fieldcount = 0;
             //students_registered
+            console.log('school_id', school_id);
             if (field === 'students_registered') {
               if (school_id) {
                 const searchFilter = await this.credService.credSearchFilter({
                   orgId: school_id,
                 });
+                console.log('searchFilter', searchFilter);
                 try {
-                  if (!searchFilter?.error) {
+                  if (searchFilter?.error) {
+                  } else {
                     fieldcount = searchFilter.length;
                   }
                 } catch (e) {}
