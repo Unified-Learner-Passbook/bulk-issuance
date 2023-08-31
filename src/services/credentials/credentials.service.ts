@@ -283,7 +283,7 @@ export class CredentialsService {
       subject: subjectFilter,
     });
 
-    const url = process.env.CRED_URL + 'credentials/search';
+    const url = process.env.CRED_URL + '/credentials/search';
 
     const config: AxiosRequestConfig = {
       headers: {

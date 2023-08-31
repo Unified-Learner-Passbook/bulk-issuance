@@ -2521,7 +2521,7 @@ export class BulkIssuanceService {
           searchSchema,
           'Instructor',
         );
-        console.log('Instructor Details', instructorDetails);
+        //console.log('Instructor Details', instructorDetails);
         if (instructorDetails.length == 0) {
           //register in keycloak and then in sunbird rc
           return response.status(400).send({
@@ -2539,13 +2539,13 @@ export class BulkIssuanceService {
             let field = countFields[i];
             let fieldcount = 0;
             //students_registered
-            console.log('school_id', school_id);
+            //console.log('school_id', school_id);
             if (field === 'students_registered') {
               if (school_id) {
                 const searchFilter = await this.credService.credSearchFilter({
                   orgId: school_id,
                 });
-                console.log('searchFilter', searchFilter);
+                //console.log('searchFilter', searchFilter);
                 try {
                   if (searchFilter?.error) {
                   } else {
