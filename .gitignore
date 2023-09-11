@@ -36,5 +36,6 @@ lerna-debug.log*
 
 # env ignore
 .env
+/build/Jenkinsfile
 env.backup
 env.backup.server
