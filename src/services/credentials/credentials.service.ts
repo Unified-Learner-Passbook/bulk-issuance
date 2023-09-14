@@ -8,7 +8,7 @@ export class CredentialsService {
 
   //schema Create
   async schemaCreate(postrequest) {
-    const url = `${process.env.SCHEMA_URL}/schema`;
+    const url = `${process.env.SCHEMA_URL}/credential-schema`;
     var data = JSON.stringify(postrequest);
     var config = {
       headers: {
@@ -33,7 +33,7 @@ export class CredentialsService {
 
   //schema list
   async schemaList(taglist) {
-    const url = `${process.env.SCHEMA_URL}/schema/tags?tags=${taglist}`;
+    const url = `${process.env.SCHEMA_URL}/credential-schema?tags=${taglist}`;
     let response_list = null;
     try {
       const observable = this.httpService.get(url);
@@ -52,7 +52,7 @@ export class CredentialsService {
 
   //schema template Create
   async schemaTemplateCreate(postrequest) {
-    const url = `${process.env.SCHEMA_URL}/rendering-template`;
+    const url = `${process.env.SCHEMA_URL}/template`;
     var data = JSON.stringify(postrequest);
     var config = {
       headers: {
@@ -77,7 +77,7 @@ export class CredentialsService {
 
   //schema template list
   async schemaTemplateList(schemaid) {
-    const url = `${process.env.SCHEMA_URL}/rendering-template/${schemaid}`;
+    const url = `${process.env.SCHEMA_URL}/rendering-template?schemaId=${schemaid}`;
     let response_list = null;
     try {
       const observable = this.httpService.get(url);
@@ -96,7 +96,7 @@ export class CredentialsService {
 
   //generate schema
   async generateSchema(schemaId) {
-    const url = `${process.env.SCHEMA_URL}/schema/jsonld?id=${schemaId}`;
+    const url = `${process.env.SCHEMA_URL}/credential-schema/${schemaId}`;
 
     try {
       const observable = this.httpService.get(url);
@@ -160,7 +160,6 @@ export class CredentialsService {
           'https://www.w3.org/2018/credentials/v1',
           'https://www.w3.org/2018/credentials/examples/v1',
         ],
-        id: 'did:ulp:b4a191af-d86e-453c-9d0e-dd4771067235',
         type: ['VerifiableCredential', 'UniversityDegreeCredential'],
         issuer: `${payload.issuerId}`,
         issuanceDate: payload.issuanceDate,
@@ -174,7 +173,9 @@ export class CredentialsService {
         },
       },
       credentialSchemaId: payload.credSchema.id,
+      credentialSchemaVersion: '3.0.0',
       tags: ['tag1', 'tag2', 'tag3'],
+      method: 'cbse',
     });
 
     const url = `${process.env.CRED_URL}/credentials/issue`;
@@ -205,7 +206,6 @@ export class CredentialsService {
           'https://www.w3.org/2018/credentials/v1',
           'https://www.w3.org/2018/credentials/examples/v1',
         ],
-        id: 'did:ulp:b4a191af-d86e-453c-9d0e-dd4771067235',
         type: ['VerifiableCredential', 'UniversityDegreeCredential'],
         issuer: `${payload.issuerId}`,
         issuanceDate: payload.issuanceDate,
@@ -219,7 +219,9 @@ export class CredentialsService {
         },
       },
       credentialSchemaId: payload.credSchema.id,
+      credentialSchemaVersion: '3.0.0',
       tags: ['tag1', 'tag2', 'tag3'],
+      method: 'cbse',
     });
     const url = `${process.env.CRED_URL}/credentials/issue`;
 
