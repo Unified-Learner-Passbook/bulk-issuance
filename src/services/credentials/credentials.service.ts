@@ -176,7 +176,6 @@ export class CredentialsService {
       credentialSchemaVersion: '1.0.0',
       tags: ['tag1', 'tag2', 'tag3'],
     });
-
     const url = `${process.env.CRED_URL}/credentials/issue`;
 
     const config: AxiosRequestConfig = {
@@ -218,9 +217,8 @@ export class CredentialsService {
         },
       },
       credentialSchemaId: payload.credSchema.id,
-      credentialSchemaVersion: '3.0.0',
+      credentialSchemaVersion: '1.0.0',
       tags: ['tag1', 'tag2', 'tag3'],
-      method: 'cbse',
     });
     const url = `${process.env.CRED_URL}/credentials/issue`;
 
