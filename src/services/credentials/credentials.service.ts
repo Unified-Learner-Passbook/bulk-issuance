@@ -173,7 +173,7 @@ export class CredentialsService {
         },
       },
       credentialSchemaId: payload.credSchema.id,
-      credentialSchemaVersion: '1.0.0',
+      credentialSchemaVersion: payload.credSchema.version,
       tags: ['tag1', 'tag2', 'tag3'],
     });
     const url = `${process.env.CRED_URL}/credentials/issue`;
@@ -217,7 +217,7 @@ export class CredentialsService {
         },
       },
       credentialSchemaId: payload.credSchema.id,
-      credentialSchemaVersion: '1.0.0',
+      credentialSchemaVersion: payload.credSchema.version,
       tags: ['tag1', 'tag2', 'tag3'],
     });
     const url = `${process.env.CRED_URL}/credentials/issue`;
